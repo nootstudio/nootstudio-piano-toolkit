@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Piano Akkoorden</title>
+    <link rel="stylesheet" href="styles.css?v=20260713-ninth-chords">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Piano</p>
+          <h1 id="appTitle">Akkoordenoverzicht</h1>
+        </div>
+        <div class="current-chord" aria-live="polite">
+          <span id="currentName">C majeur</span>
+          <strong id="currentNotes">C - E - G</strong>
+          <button class="play-button" id="playChordButton" type="button" aria-label="Speel akkoord">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <nav class="page-tabs" aria-label="Pagina's">
+        <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
+        <button class="page-tab" data-page="song" type="button">Liedje</button>
+        <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
+      </nav>
+
+      <section class="page-view active" data-page-view="chords">
+        <section class="workspace" aria-label="Akkoordkiezer">
+          <aside class="controls">
+            <div class="scale-control-row">
+              <div class="control-group">
+                <label for="keySelect">Toonladder</label>
+                <select id="keySelect"></select>
+              </div>
+
+              <div class="control-group">
+                <label for="scaleSelect">Soort toonladder</label>
+                <select id="scaleSelect"></select>
+              </div>
+            </div>
+
+            <aside class="circle-panel" aria-label="Kwintencirkel">
+              <div class="section-heading">
+                <h2>Kwintencirkel</h2>
+                <span id="circleKeyLabel">C majeur</span>
+              </div>
+              <div class="circle-wrap">
+                <svg id="fifthsCircle" viewBox="0 0 360 360" role="img" aria-label="Kwintencirkel met gekozen toonsoort"></svg>
+              </div>
+            </aside>
+
+            <div class="chord-mode-switch" role="group" aria-label="Akkoordmodus">
+              <button class="chord-mode-button active" data-chord-mode="browse" type="button">Kies akkoord</button>
+              <button class="chord-mode-button" data-chord-mode="search" type="button">Zoek akkoord</button>
+            </div>
+
+            <div class="control-group indented-control" id="chordPickerControl">
+              <label>Akkoord</label>
+              <div class="split-control">
+                <select id="rootSelect" aria-label="Grondtoon akkoord"></select>
+                <select id="qualitySelect" aria-label="Soort akkoord"></select>
+              </div>
+            </div>
+
+            <div class="chord-search-panel" id="chordSearchPanel" hidden>
+              <div>
+                <span>Gekozen tonen</span>
+                <strong id="searchNotesLabel">Geen tonen gekozen</strong>
+              </div>
+              <div>
+                <span>Gevonden akkoord</span>
+                <strong id="searchResultLabel">Klik tonen op het klavier</strong>
+              </div>
+              <button id="clearSearchButton" type="button">Wis</button>
+            </div>
+
+            <div class="control-group indented-control">
+              <label for="inversionSelect">Ligging</label>
+              <select id="inversionSelect">
+                <option value="0">Grondligging</option>
+                <option value="1">1e omkering</option>
+                <option value="2">2e omkering</option>
+                <option value="3">3e omkering</option>
+              </select>
+            </div>
+
+            <div class="mobile-chord-detail">
+              <div class="note-strip" id="noteStrip" aria-label="Akkoordtonen"></div>
+            </div>
+            <div class="scale-strip" id="scaleStrip" aria-label="Toonladdertonen"></div>
+            <button class="scale-play-button" id="playScaleButton" type="button">
+              <span aria-hidden="true"></span>
+              Speel toonladder
+            </button>
+
+          </aside>
+
+          <section class="keyboard-panel" aria-label="Pianoklavier">
+            <div class="keyboard-header">
+              <h2 id="pianoTitle">C majeur</h2>
+              <div class="toggle-row" role="group" aria-label="Weergave">
+                <button class="mode-button active" data-mode="notes" type="button">Noten</button>
+                <button class="mode-button" data-mode="degrees" type="button">Trappen</button>
+              </div>
+            </div>
+            <div class="keyboard-scroll">
+              <div class="keyboard" id="keyboard"></div>
+            </div>
+            <div class="degree-chords" id="degreeChords" aria-label="Basisakkoorden op de trappen"></div>
+            <section class="chord-sequence-panel" id="chordSequencePanel" aria-label="Gekozen akkoordreeks">
+              <div class="chord-sequence-head">
+                <h3>Akkoordreeks</h3>
+                <div class="chord-sequence-actions">
+                  <button id="addChordSequence" class="add-sequence-button" type="button">Voeg toe</button>
+                  <button id="searchChordSequence" type="button">Zoek liedjes</button>
+                  <button id="resetChordSequence" type="button">Reset</button>
+                </div>
+              </div>
+              <div class="chord-sequence-list" id="chordSequenceList" aria-live="polite"></div>
+              <div class="chord-sequence-notation" id="chordSequenceNotation" aria-label="Akkoordreeks op de notenbalk"></div>
+              <div class="chord-sequence-results" id="chordSequenceResults" aria-live="polite"></div>
+            </section>
+            <section class="chord-notation-panel" aria-label="Noten van gekozen akkoord">
+              <div>
+                <h3>Noten op de notenbalk</h3>
+                <span id="chordNotationTitle">C</span>
+              </div>
+              <div class="chord-notation-staff song-notation" id="chordNotationStaff" aria-hidden="true"></div>
+            </section>
+            <section class="selected-song-chords" id="selectedSongChords" aria-label="Akkoorden van gekozen lied" hidden>
+              <div class="selected-song-head">
+              <div>
+                <h3 id="selectedSongTitle">Gekozen lied</h3>
+                <span class="selected-song-artist" id="selectedSongArtist"></span>
+                <span class="selected-song-meta" id="selectedSongMeta"></span>
+              </div>
+              <label class="selected-song-transpose">
+                Transponeer naar
+                <select id="selectedSongTranspose"></select>
+              </label>
+            </div>
+              <div class="selected-song-chord-list" id="selectedSongChordList"></div>
+            </section>
+
+            <section class="library" aria-label="Alle akkoorden">
+              <button class="library-toggle" id="libraryToggle" type="button" aria-expanded="false" aria-controls="libraryContent">
+                <span>Akkoorden per noot</span>
+                <i aria-hidden="true"></i>
+              </button>
+              <div class="library-content" id="libraryContent" hidden>
+                <div class="section-heading">
+                  <input id="filterInput" type="search" placeholder="Zoek op C, mineur, septiem...">
+                </div>
+                <div class="root-tabs" id="rootTabs" aria-label="Kies noot"></div>
+                <div class="chord-grid" id="chordGrid"></div>
+              </div>
+            </section>
+          </section>
+        </section>
+        <div class="floating-chord" id="floatingChord" hidden></div>
+        <section class="song-inspiration" aria-label="Liedjes bij deze toonladder">
+          <div class="song-inspiration-head">
+            <div>
+              <h2>Liedjes in deze toonsoort</h2>
+              <span id="inspirationKeyLabel">C majeur</span>
+            </div>
+            <button id="inspirationRefreshButton" type="button">Andere</button>
+          </div>
+          <div class="inspiration-tools">
+            <label class="inspiration-search">
+              <span>Zoeken</span>
+              <input id="inspirationSearch" type="search" autocomplete="off" placeholder="Titel, artiest, genre...">
+            </label>
+            <label class="inspiration-sort">
+              <span>Sorteren</span>
+              <select id="inspirationSort">
+                <option value="title" selected>Titel A-Z</option>
+                <option value="recent">Nieuw toegevoegd</option>
+                <option value="artist">Artiest A-Z</option>
+                <option value="year">Jaar</option>
+                <option value="level">Niveau</option>
+              </select>
+            </label>
+            <button class="inspiration-favorite-filter" id="inspirationFavoriteFilter" type="button">Favorieten</button>
+          </div>
+          <div class="inspiration-list" id="inspirationList"></div>
+          <details class="song-add-panel">
+            <summary>Liedje toevoegen</summary>
+            <form class="song-add-form" id="addSongForm">
+              <div class="song-add-grid">
+                <label>
+                  Titel
+                  <input id="addSongTitle" type="text" autocomplete="off" required>
+                </label>
+                <label>
+                  Artiest
+                  <input id="addSongArtist" type="text" autocomplete="off" required>
+                </label>
+                <label>
+                  Toonladder
+                  <select id="addSongKey"></select>
+                </label>
+                <label>
+                  Genre
+                  <input id="addSongStyle" type="text" autocomplete="off" placeholder="Pop">
+                </label>
+                <label>
+                  Jaar
+                  <input id="addSongYear" type="text" inputmode="numeric" autocomplete="off">
+                </label>
+                <label>
+                  Niveau
+                  <input id="addSongLevel" type="text" autocomplete="off" placeholder="Beginner">
+                </label>
+                <label class="song-add-wide">
+                  Afbeelding
+                  <input id="addSongImage" type="url" autocomplete="off" placeholder="https://...">
+                </label>
+                <label class="song-add-wide">
+                  YouTube-link
+                  <input id="addSongYoutube" type="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=...">
+                </label>
+                <label class="song-add-wide">
+                  Audio-link
+                  <input id="addSongMediaUrl" type="url" autocomplete="off" placeholder="https://jouwdomein.nl/audio/liedje.mp3">
+                </label>
+                <label class="song-add-wide">
+                  Audio/video bestand
+                  <input id="addSongMedia" type="file" accept="audio/*,video/*">
+                </label>
+                <label class="song-add-wide">
+                  MusicXML
+                  <input id="addSongXml" type="file" accept=".xml,.musicxml,application/xml,text/xml">
+                </label>
+              </div>
+              <div class="song-add-actions">
+                <button type="submit">Voeg liedje toe</button>
+                <button class="library-sync-button" id="librarySyncButton" type="button">Sync online</button>
+                <button class="song-delete-selected-button" id="deleteSelectedSongButton" type="button">Verwijder geselecteerd</button>
+              </div>
+              <p id="addSongStatus" aria-live="polite"></p>
+            </form>
+          </details>
+          <p class="inspiration-status" id="inspirationStatus" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section class="page-view" data-page-view="song" aria-label="Liedje">
+        <section class="song-page">
+          <div class="song-print-actions">
+            <button class="song-print-button" id="songPrintButton" type="button">Print</button>
+          </div>
+
+          <section class="song-title-card" aria-label="Titel en artiest">
+            <div class="song-title-fields">
+              <div class="control-group">
+                <label for="songTitleInput">Titel</label>
+                <input id="songTitleInput" type="text" placeholder="Titel van het lied">
+              </div>
+              <div class="control-group">
+                <label for="songArtistInput">Artiest</label>
+                <input id="songArtistInput" type="text" placeholder="Artiest">
+              </div>
+            </div>
+            <div class="song-title-display" aria-live="polite">
+              <strong id="songTitleDisplay"></strong>
+              <span id="songArtistDisplay"></span>
+            </div>
+          </section>
+
+          <div class="song-controls">
+            <div class="control-group">
+              <label for="songKeySelect">Toonsoort</label>
+              <select id="songKeySelect"></select>
+            </div>
+            <div class="control-group">
+              <label for="songScaleSelect">Soort toonladder</label>
+              <select id="songScaleSelect"></select>
+            </div>
+            <div class="control-group">
+              <label for="songMeterSelect">Maatsoort</label>
+              <select id="songMeterSelect">
+                <option value="4/4">4/4</option>
+                <option value="3/4">3/4</option>
+                <option value="6/8">6/8</option>
+                <option value="12/8">12/8</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="songBpmInput">BPM</label>
+              <input id="songBpmInput" type="number" min="40" max="220" step="1" value="84">
+            </div>
+            <div class="control-group">
+              <label for="songVoicingSelect">Startligging</label>
+              <select id="songVoicingSelect">
+                <option value="high">2e omkering (hoog)</option>
+                <option value="middle">1e omkering (midden)</option>
+                <option value="low" selected>Grondligging (laag)</option>
+              </select>
+            </div>
+            <button class="song-play-button" id="songPlayButton" type="button">
+              <span aria-hidden="true"></span>
+              Speel liedje
+            </button>
+          </div>
+
+          <section class="song-import" aria-label="Liedje importeren">
+            <div class="section-heading">
+              <h2>Liedje importeren</h2>
+            </div>
+            <textarea id="songImportText" rows="8" spellcheck="false" placeholder="Toonsoort: D majeur&#10;Maatsoort: 4/4&#10;BPM: 84&#10;&#10;[Intro]&#10;D A Bm G&#10;&#10;[Verse 1]&#10;D        A        Bm       G&#10;Hier kan gewoon songtekst staan&#10;&#10;[Chorus]&#10;| G | D | A | Bm |&#10;Of tekst met [G]akkoorden [D]tussen haken"></textarea>
+            <div class="song-import-actions">
+              <button class="song-import-button" id="songImportButton" type="button">Importeer liedje</button>
+              <label class="song-file-button" for="songXmlInput">Importeer MusicXML</label>
+              <input id="songXmlInput" type="file" accept=".xml,.musicxml,application/xml,text/xml">
+              <p id="songImportStatus" aria-live="polite"></p>
+            </div>
+          </section>
+
+          <section class="student-summary" aria-label="Liedje samenvatting">
+            <div>
+              <span>Toonsoort</span>
+              <strong id="studentKeyLabel">C majeur</strong>
+            </div>
+            <div>
+              <span>Maatsoort</span>
+              <strong id="studentMeterLabel">4/4</strong>
+            </div>
+            <div>
+              <span>Tempo</span>
+              <strong id="studentBpmLabel">84 BPM</strong>
+            </div>
+          </section>
+
+          <section class="song-arrangement" aria-label="Songvolgorde">
+            <div class="section-heading">
+              <h2>Volgorde</h2>
+            </div>
+            <div class="song-block-palette" id="songBlockPalette" aria-label="Songblokken">
+              <button class="song-preset" type="button">Intro</button>
+              <button class="song-preset" type="button">Verse</button>
+              <button class="song-preset" type="button">Pre Chorus</button>
+              <button class="song-preset" type="button">Chorus</button>
+              <button class="song-preset" type="button">Bridge</button>
+              <button class="song-preset" type="button">Solo</button>
+              <button class="song-preset" type="button">Break</button>
+              <button class="song-preset" type="button">Outro</button>
+            </div>
+            <div class="song-order" id="songOrder" aria-label="Sleepbare songvolgorde">
+              <button class="song-order-item" type="button"><strong>Intro</strong><em aria-hidden="true">x</em></button>
+              <button class="song-order-item" type="button"><strong>Verse</strong><em aria-hidden="true">x</em></button>
+              <button class="song-order-item" type="button"><strong>Chorus</strong><em aria-hidden="true">x</em></button>
+            </div>
+          </section>
+
+          <section class="song-scale-overview" aria-label="Toonladder van het lied">
+            <div class="section-heading">
+              <h2 id="songScaleTitle">C majeur toonladder</h2>
+            </div>
+            <div class="song-scale-content">
+              <div class="song-scale-keyboard" id="songScaleKeyboard"></div>
+              <div class="song-scale-notation" id="songScaleNotation"></div>
+              <div class="song-scale-note-row" id="songScaleNoteRow"></div>
+            </div>
+          </section>
+
+          <div class="song-sections" id="songSections"></div>
+        </section>
+      </section>
+
+      <section class="page-view" data-page-view="custom" aria-label="Zelf samenstellen">
+        <section class="custom-page">
+          <section class="custom-title-card" aria-label="Titel en artiest">
+            <div class="custom-title-fields">
+              <label>
+                Titel
+                <input id="customTitleInput" type="text" autocomplete="off" placeholder="Titel van het lied">
+              </label>
+              <label>
+                Artiest
+                <input id="customArtistInput" type="text" autocomplete="off" placeholder="Artiest">
+              </label>
+            </div>
+            <div class="custom-print-title">
+              <strong id="customTitleDisplay">Titel</strong>
+              <span id="customArtistDisplay"></span>
+            </div>
+            <img class="custom-print-logo" src="assets/nootstudio-logo-zwart-crop.png" alt="Nootstudio">
+            <div class="custom-print-scale" id="customPrintScale" aria-hidden="true"></div>
+          </section>
+
+          <section class="custom-builder-card" aria-label="Akkoorden zelf samenstellen">
+            <div class="custom-builder-head">
+              <div>
+                <h2>Zelf samenstellen</h2>
+                <span>Kies eerst een toonladder. Voeg daarna akkoorden toe aan de rechterkant van je reeks.</span>
+              </div>
+              <button class="custom-print-button" id="customPrintButton" type="button">Print</button>
+            </div>
+
+            <div class="custom-scale-picker">
+              <label>
+                Toonladder
+                <select id="customKeySelect"></select>
+              </label>
+              <label>
+                Soort toonladder
+                <select id="customScaleSelect"></select>
+              </label>
+            </div>
+
+            <div class="custom-picker">
+              <label>
+                Grondtoon
+                <select id="customRootSelect"></select>
+              </label>
+              <label>
+                Akkoord
+                <select id="customQualitySelect"></select>
+              </label>
+              <button id="customAddChordButton" type="button">Voeg toe</button>
+              <button id="customResetButton" type="button">Reset</button>
+            </div>
+
+            <div class="custom-text-add">
+              <label>
+                Akkoord typen
+                <input id="customChordText" type="text" autocomplete="off" placeholder="Bijv. C, Dm7, F#maj9">
+              </label>
+              <button id="customAddTypedChordButton" type="button">Voeg toe</button>
+            </div>
+
+            <div class="custom-example-panel" aria-label="Voorbeeldakkoorden uit de toonladder">
+              <h3>Akkoorden uit de toonladder</h3>
+              <div class="custom-example-grid" id="customExampleGrid"></div>
+            </div>
+
+            <div class="custom-grid" id="customGrid" aria-live="polite"></div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
+    <script src="app-config.js?v=20260711-dot-staff-tight"></script>
+    <script src="app.js?v=20260713-ninth-chords"></script>
+  </body>
+</html>

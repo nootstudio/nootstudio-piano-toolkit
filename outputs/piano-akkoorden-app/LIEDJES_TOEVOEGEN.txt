@@ -1,0 +1,44 @@
+Liedjes toevoegen
+=================
+
+Open songs.json en plaats een liedje onder de juiste toonladder.
+
+Voorbeeld:
+
+"C majeur": [
+  {
+    "titel": "Piano man",
+    "artiest": "Billy Joel",
+    "genre": "Pop",
+    "jaar": "1973",
+    "niveau": "Beginner",
+    "afbeelding": "https://...",
+    "youtube": "https://www.youtube.com/watch?v=...",
+    "bestand": "musicxml/piano-man.musicxml"
+  }
+]
+
+Velden:
+- titel: naam van het lied
+- artiest: artiest
+- genre: bijvoorbeeld Pop, Rock, Soul
+- jaar: jaartal
+- niveau: bijvoorbeeld Beginner
+- afbeelding: internetlink naar een afbeelding, mag leeg blijven
+- youtube: link naar een YouTube-video, mag leeg blijven
+- bestand: pad naar een MusicXML-bestand, mag leeg blijven
+
+Wil je audio of video echt in de app afspelen?
+Gebruik dan het veld "Audio/video bestand" in het formulier op de site.
+Dat bestand wordt lokaal in je browser opgeslagen en werkt op dat apparaat.
+
+MusicXML-bestanden zet je bij voorkeur in een map:
+musicxml/
+
+Voorbeeld:
+musicxml/piano-man.musicxml
+
+Let op:
+- Gebruik komma's tussen liedjes.
+- Laat de laatste regel in een lijst zonder komma.
+- Open de app via de lokale server, anders kan de browser songs.json of MusicXML-bestanden blokkeren.
