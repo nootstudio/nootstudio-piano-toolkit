@@ -173,6 +173,7 @@ const studentCodeStorageKey = "nootstudioPianoAkkoordenStudentCode";
 const mediaDatabaseName = "nootstudioPianoAkkoordenMedia";
 const mediaStoreName = "media";
 const remoteConfig = window.NOOTSTUDIO_CONFIG || {};
+let authAccessToken = "";
 
 let songInspirations = {
   major: {
@@ -594,6 +595,12 @@ const customResetButton = document.querySelector("#customResetButton");
 const customPrintButton = document.querySelector("#customPrintButton");
 const customGrid = document.querySelector("#customGrid");
 const customExampleGrid = document.querySelector("#customExampleGrid");
+const authGate = document.querySelector("#authGate");
+const authForm = document.querySelector("#authForm");
+const authEmail = document.querySelector("#authEmail");
+const authSubmit = document.querySelector("#authSubmit");
+const authStatus = document.querySelector("#authStatus");
+const authLogout = document.querySelector("#authLogout");
 
 const chordNotationHome = {
   parent: chordNotationPanel?.parentElement || null,
@@ -2107,11 +2114,98 @@ function remoteBaseUrl() {
 }
 
 function remoteHeaders(extra = {}) {
+  const token = authAccessToken || remoteConfig.supabaseAnonKey;
   return {
     apikey: remoteConfig.supabaseAnonKey,
-    Authorization: `Bearer ${remoteConfig.supabaseAnonKey}`,
+    Authorization: `Bearer ${token}`,
     ...extra
   };
+}
+
+function authClientEnabled() {
+  return Boolean(remoteConfig.supabaseUrl && remoteConfig.supabaseAnonKey && window.supabase?.createClient);
+}
+
+const authClient = authClientEnabled()
+  ? window.supabase.createClient(remoteBaseUrl(), remoteConfig.supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+  : null;
+
+function setAuthStatus(message, isError = false) {
+  if (!authStatus) return;
+  authStatus.textContent = message;
+  authStatus.classList.toggle("is-error", Boolean(isError));
+}
+
+function setAuthView(mode) {
+  document.body.classList.remove("auth-loading", "auth-locked", "auth-unlocked");
+  document.body.classList.add(mode);
+  if (authGate) authGate.hidden = mode === "auth-unlocked";
+  if (authLogout) authLogout.hidden = mode !== "auth-unlocked";
+}
+
+async function claimCurrentUserEntitlements() {
+  if (!authClient) return 0;
+  const { data, error } = await authClient.rpc("claim_entitlements_for_current_user");
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+async function hasActiveEntitlement() {
+  if (!authClient) return false;
+  const { data, error } = await authClient.rpc("has_active_entitlement");
+  if (error) throw error;
+  return Boolean(data);
+}
+
+async function refreshAuthAccess({ showWelcome = false } = {}) {
+  if (!authClient) {
+    setAuthView("auth-locked");
+    setAuthStatus("Login is nog niet beschikbaar. Controleer de Supabase-instellingen.", true);
+    return false;
+  }
+
+  setAuthView("auth-loading");
+  const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+  if (sessionError) {
+    setAuthView("auth-locked");
+    setAuthStatus("Inloggen lukte niet. Probeer de link opnieuw.", true);
+    return false;
+  }
+
+  const session = sessionData?.session;
+  if (!session?.user) {
+    authAccessToken = "";
+    setAuthView("auth-locked");
+    setAuthStatus("Log in met het e-mailadres waarmee de app is gekocht.");
+    return false;
+  }
+
+  try {
+    authAccessToken = session.access_token || "";
+    await claimCurrentUserEntitlements();
+    const allowed = await hasActiveEntitlement();
+    if (!allowed) {
+      setAuthView("auth-locked");
+      setAuthStatus("Dit e-mailadres heeft nog geen actieve toegang. Controleer het e-mailadres van de bestelling.", true);
+      return false;
+    }
+
+    setAuthView("auth-unlocked");
+    setAuthStatus(showWelcome ? "Je bent ingelogd. De app is geopend." : "");
+    loadRemoteSongLibrary();
+    return true;
+  } catch (error) {
+    setAuthView("auth-locked");
+    setAuthStatus("De toegang kon niet gecontroleerd worden. Probeer het zo opnieuw.", true);
+    console.warn("auth access check failed", error);
+    return false;
+  }
 }
 
 function safeRemotePathPart(value) {
@@ -6333,6 +6427,53 @@ customAddChordButton?.addEventListener("click", addCustomChord);
 customAddTypedChordButton?.addEventListener("click", addTypedCustomChord);
 customResetButton?.addEventListener("click", resetCustomChords);
 
+authForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!authClient || !authEmail || !authSubmit) {
+    setAuthStatus("Login is nog niet beschikbaar. Controleer de Supabase-instellingen.", true);
+    return;
+  }
+
+  const email = authEmail.value.trim().toLowerCase();
+  if (!email) return;
+
+  authSubmit.disabled = true;
+  setAuthStatus("Loginlink wordt verstuurd...");
+  try {
+    const { error } = await authClient.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.href.split("#")[0]
+      }
+    });
+    if (error) throw error;
+    setAuthStatus("Check je e-mail. Klik op de link om de app op dit apparaat te openen.");
+  } catch (error) {
+    setAuthStatus("De loginlink kon niet verstuurd worden. Controleer het e-mailadres en probeer opnieuw.", true);
+    console.warn("auth magic link failed", error);
+  } finally {
+    authSubmit.disabled = false;
+  }
+});
+
+authLogout?.addEventListener("click", async () => {
+  await authClient?.auth.signOut();
+  authAccessToken = "";
+  setAuthView("auth-locked");
+  setAuthStatus("Je bent uitgelogd. Log opnieuw in om de app te openen.");
+});
+
+authClient?.auth.onAuthStateChange((event) => {
+  if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+    refreshAuthAccess({ showWelcome: event === "SIGNED_IN" });
+  }
+  if (event === "SIGNED_OUT") {
+    authAccessToken = "";
+    setAuthView("auth-locked");
+    setAuthStatus("Log in met het e-mailadres waarmee de app is gekocht.");
+  }
+});
+
 customPrintButton?.addEventListener("click", () => {
   customState.isPrinting = true;
   document.body.classList.add("custom-printing");
@@ -6455,3 +6596,4 @@ restoreStudentCode();
 render();
 loadSongJsonLibrary();
 loadRemoteSongLibrary();
+refreshAuthAccess();

@@ -6,7 +6,23 @@
     <title>Piano Akkoorden</title>
     <link rel="stylesheet" href="styles.css?v=20260713-ninth-chords">
   </head>
-  <body>
+  <body class="auth-loading">
+    <section class="auth-gate" id="authGate" aria-live="polite">
+      <div class="auth-card">
+        <p class="eyebrow">Nootstudio</p>
+        <h1>Akkoordenoverzicht</h1>
+        <p class="auth-copy">Log in met het e-mailadres waarmee de app is gekocht.</p>
+        <form class="auth-form" id="authForm">
+          <label for="authEmail">E-mailadres</label>
+          <div class="auth-row">
+            <input id="authEmail" type="email" autocomplete="email" placeholder="jij@voorbeeld.nl" required>
+            <button id="authSubmit" type="submit">Stuur loginlink</button>
+          </div>
+        </form>
+        <p class="auth-status" id="authStatus">Je ontvangt een veilige link per e-mail. Op dit apparaat blijf je daarna ingelogd.</p>
+      </div>
+    </section>
+
     <main class="app-shell">
       <header class="topbar">
         <div>
@@ -19,6 +35,7 @@
           <button class="play-button" id="playChordButton" type="button" aria-label="Speel akkoord">
             <span aria-hidden="true"></span>
           </button>
+          <button class="auth-logout" id="authLogout" type="button" hidden>Uitloggen</button>
         </div>
       </header>
 
@@ -446,7 +463,8 @@
     </main>
 
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260713-ninth-chords"></script>
+    <script src="app.js?v=20260714-auth-gate"></script>
   </body>
 </html>

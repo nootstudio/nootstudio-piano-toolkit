@@ -29,6 +29,109 @@ body {
   font-family: "BW Glenn Slab", "Bw Glenn Slab", "BW Glenn Slab Regular", Georgia, serif;
 }
 
+body.auth-loading .app-shell,
+body.auth-locked .app-shell {
+  display: none;
+}
+
+body.auth-unlocked .auth-gate {
+  display: none;
+}
+
+.auth-gate {
+  width: min(760px, calc(100vw - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.auth-card {
+  width: 100%;
+  padding: clamp(24px, 5vw, 44px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.94);
+  box-shadow: var(--shadow);
+}
+
+.auth-card h1 {
+  margin-bottom: 14px;
+}
+
+.auth-copy,
+.auth-status {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-copy {
+  margin: 0 0 24px;
+  font-size: 1.05rem;
+}
+
+.auth-form label {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.auth-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.auth-row input {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.auth-row button,
+.auth-logout {
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #151515;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.auth-row button {
+  min-width: 170px;
+  padding: 0 18px;
+}
+
+.auth-row button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.auth-status {
+  min-height: 1.5em;
+  margin: 16px 0 0;
+}
+
+.auth-status.is-error {
+  color: #9d1d1d;
+}
+
+.auth-logout {
+  padding: 8px 12px;
+  background: #efede6;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 button,
 input,
 select {
@@ -3595,6 +3698,14 @@ textarea {
   .app-shell {
     width: min(100vw - 20px, 1180px);
     padding-top: 10px;
+  }
+
+  .auth-row {
+    display: grid;
+  }
+
+  .auth-row button {
+    min-height: 50px;
   }
 
   .topbar,
