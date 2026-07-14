@@ -187,7 +187,10 @@ async function processPaidOrder(order) {
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+  if (event.httpMethod !== "POST") {
+    console.log("shopify-webhook rejected non-POST request", { method: event.httpMethod });
+    return json(405, { error: "Method not allowed" });
+  }
 
   const rawBody = rawRequestBody(event);
   const headers = event.headers || {};
@@ -197,29 +200,48 @@ exports.handler = async (event) => {
   const webhookId = headers["x-shopify-webhook-id"] || headers["X-Shopify-Webhook-Id"]
     || crypto.createHash("sha256").update(rawBody).digest("hex");
 
+  console.log("shopify-webhook received", {
+    topic: topic || "missing",
+    shopDomain: shopDomain || "missing",
+    webhookId,
+    hasHmac: Boolean(hmac),
+    bodyBytes: rawBody.length
+  });
+
   if (!verifyShopifyHmac(rawBody, hmac, requiredEnv("SHOPIFY_WEBHOOK_SECRET"))) {
+    console.warn("shopify-webhook invalid hmac", {
+      topic: topic || "missing",
+      shopDomain: shopDomain || "missing",
+      webhookId,
+      hasHmac: Boolean(hmac)
+    });
     return json(401, { error: "Invalid HMAC" });
   }
 
   const existing = await existingWebhookEvent(webhookId);
   if (existing?.status === "processed" || existing?.status === "ignored") {
+    console.log("shopify-webhook duplicate ignored", { webhookId, status: existing.status });
     return json(200, { ok: true, duplicate: true });
   }
 
   const payload = JSON.parse(rawBody.toString("utf8"));
   const eventRow = existing || await insertWebhookEvent({ webhookId, topic, shopDomain, payload });
+  console.log("shopify-webhook event stored", { webhookId, topic, eventId: eventRow.id });
 
   try {
     if (topic !== "orders/paid") {
       await markWebhookEvent(eventRow.id, "ignored");
+      console.log("shopify-webhook ignored topic", { webhookId, topic });
       return json(200, { ok: true, ignored: topic || "unknown topic" });
     }
 
     const result = await processPaidOrder(payload);
     await markWebhookEvent(eventRow.id, result.status);
+    console.log("shopify-webhook completed", { webhookId, ...result });
     return json(200, { ok: true, ...result });
   } catch (error) {
     await markWebhookEvent(eventRow.id, "failed", error.message);
+    console.error("shopify-webhook failed", { webhookId, message: error.message });
     return json(500, { error: "Webhook processing failed" });
   }
 };
