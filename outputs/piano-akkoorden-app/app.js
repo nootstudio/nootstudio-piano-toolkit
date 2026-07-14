@@ -80,6 +80,22 @@ const fifthsCircle = [
   { label: "F", aliases: ["F"] }
 ];
 
+const scaleVideos = {
+  "C|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/C-majeur-toonladder-_-rechterhand.mp4",
+  "G|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/G-majeur-toonladder-_-rechterhand.mp4",
+  "D|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/D-majeur-toonladder-_-rechterhand.mp4",
+  "A|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/A-majeur-toonladder-_-rechterhand.mp4",
+  "E|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/E-majeur-toonladder-_-rechterhand.mp4",
+  "B|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/B-majeur-toonladder-_-rechterhand.mp4",
+  "F#|major": "https://youtu.be/ZdyBtt8OGRw",
+  "Gb|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/Gb-majeur-toonladder-_-rechterhand.mp4",
+  "Db|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/Db-majeur-toonladder-_-rechterhand.mp4",
+  "Ab|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/Ab-majeur-toonladder-_-rechterhand.mp4",
+  "Eb|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/Eb-majeur-toonladder-_-rechterhand.mp4",
+  "Bb|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/Bb-majeur-toonladder-_-rechterhand.mp4",
+  "F|major": "https://app.nootstudio.nl/wp-content/uploads/2026/07/F-majeur-toonladder-_-rechterhand.mp4"
+};
+
 const qualities = [
   { id: "maj", name: "majeur", symbol: "", intervals: [0, 4, 7], degrees: ["1", "3", "5"] },
   { id: "min", name: "mineur", symbol: "m", intervals: [0, 3, 7], degrees: ["1", "b3", "5"] },
@@ -512,6 +528,11 @@ const selectedSongArtist = document.querySelector("#selectedSongArtist");
 const selectedSongMeta = document.querySelector("#selectedSongMeta");
 const selectedSongTranspose = document.querySelector("#selectedSongTranspose");
 const selectedSongChordList = document.querySelector("#selectedSongChordList");
+const scaleVideoPanel = document.querySelector("#scaleVideoPanel");
+const scaleVideoDetails = document.querySelector("#scaleVideoDetails");
+const scaleVideoTitle = document.querySelector("#scaleVideoTitle");
+const scaleVideoSubtitle = document.querySelector("#scaleVideoSubtitle");
+const scaleVideoBody = document.querySelector("#scaleVideoBody");
 const floatingChord = document.querySelector("#floatingChord");
 const fifthsCircleSvg = document.querySelector("#fifthsCircle");
 const circleKeyLabel = document.querySelector("#circleKeyLabel");
@@ -789,7 +810,8 @@ function parseChordEntry(value) {
 }
 
 function chordEntryToken(entry) {
-  return typeof entry === "object" && entry !== null ? entry.token : entry;
+  if (typeof entry !== "object" || entry === null) return entry;
+  return entry.token || entry.symbol || entry.chord || entry.name || entry.label || "";
 }
 
 function chordEntryVoicing(entry) {
@@ -1321,12 +1343,25 @@ function syncControlsToSearchResult(result) {
   updateInversions();
 }
 
+function appendNoteStripHeading(symbol, inversion) {
+  const heading = document.createElement("div");
+  heading.className = "note-strip-heading";
+  heading.innerHTML = `
+    <strong>${formatMusicText(symbol)}</strong>
+    <span>${formatMusicText(voicingLabel(inversion))}</span>
+  `;
+  noteStrip.append(heading);
+}
+
 function updateSearchSummary() {
   const result = recognizeSearchChord();
   const selectedLabels = state.searchNotes.map((absolute) => searchLabelForPitch(mod(absolute, 12), result));
   currentName.classList.toggle("search-found", Boolean(result));
   searchResultLabel?.classList.toggle("search-found", Boolean(result));
   noteStrip.innerHTML = "";
+  if (result) {
+    appendNoteStripHeading(chordSymbol(result.root, result.quality), result.inversion);
+  }
   searchNotesForKeyboard(result).slice().reverse().forEach((note) => {
     const pill = document.createElement("div");
     pill.className = "note-pill";
@@ -1692,6 +1727,15 @@ function resetAudioContext() {
   }
 }
 
+function stopStandaloneAudioPlayback() {
+  if (isSongPlaying) {
+    stopSongPlayback();
+  } else {
+    resetAudioContext();
+  }
+  clearScaleKeyHighlights();
+}
+
 function createImpulseResponse(context, seconds = 1.15, decay = 2.6) {
   const length = Math.floor(context.sampleRate * seconds);
   const impulse = context.createBuffer(2, length, context.sampleRate);
@@ -1806,6 +1850,7 @@ function playPianoTone(context, frequency, startTime, duration, velocity) {
 
 function playCurrentChord() {
   if (state.chordMode !== "search" && !state.chordActive) return;
+  stopStandaloneAudioPlayback();
   const context = getAudioContext();
   const now = context.currentTime + 0.03;
   const scale = scaleNotes(state.key, state.scale);
@@ -1843,7 +1888,7 @@ function highlightScaleKey(note, delayMs, durationMs) {
 }
 
 function playCurrentScale() {
-  clearScaleKeyHighlights();
+  stopStandaloneAudioPlayback();
   const context = getAudioContext();
   const scale = scaleNotes(state.key, state.scale);
   const finalRoot = scale[0]
@@ -2149,6 +2194,18 @@ function setAuthView(mode) {
   if (authLogout) authLogout.hidden = mode !== "auth-unlocked";
 }
 
+function isLocalDevBypass() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("dev") !== "1") return false;
+  const host = window.location.hostname;
+  return host === "localhost"
+    || host === "127.0.0.1"
+    || host === "::1"
+    || /^10\./.test(host)
+    || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+}
+
 async function claimCurrentUserEntitlements() {
   if (!authClient) return 0;
   const { data, error } = await authClient.rpc("claim_entitlements_for_current_user");
@@ -2164,6 +2221,13 @@ async function hasActiveEntitlement() {
 }
 
 async function refreshAuthAccess({ showWelcome = false } = {}) {
+  if (isLocalDevBypass()) {
+    authAccessToken = remoteConfig.supabaseAnonKey || "";
+    setAuthView("auth-unlocked");
+    setAuthStatus("Lokale ontwikkelmodus actief.");
+    return true;
+  }
+
   if (!authClient) {
     setAuthView("auth-locked");
     setAuthStatus("Login is nog niet beschikbaar. Controleer de Supabase-instellingen.", true);
@@ -2819,6 +2883,7 @@ function renderSongInspirations() {
     const label = labelFromSuggestionItem(item);
     const userSong = isUserSong(song, label);
     const favorite = isFavoriteSong(song);
+    const chordPreview = inspirationChordPreview(song);
     const card = document.createElement("button");
     card.type = "button";
     card.className = "inspiration-card";
@@ -2832,6 +2897,7 @@ function renderSongInspirations() {
         <strong>${song.title}</strong>
         <span>${song.artist}</span>
         <small><em>${song.style}</em><b>${song.year}</b>${song.level ? `<i>${song.level}</i>` : ""}${searchingAllKeys ? `<i>${formatMusicText(label)}</i>` : ""}${!songHasChordData(song) ? `<u>MusicXML later</u>` : ""}</small>
+        ${chordPreview ? `<span class="inspiration-chords">${chordPreview}</span>` : ""}
       </span>
       <span class="inspiration-favorite" aria-label="Favoriet" title="Favoriet">${favorite ? "★" : "☆"}</span>
     `;
@@ -2865,6 +2931,7 @@ function inspirationChordTokens(song) {
   if (Array.isArray(song?.sections)) {
     return song.sections
       .flatMap((section) => section.measures ? section.measures.flat() : (section.chords || []))
+      .map(chordEntryToken)
       .filter((token) => parseChordToken(token));
   }
   if (!song?.chords) return [];
@@ -2874,6 +2941,13 @@ function inspirationChordTokens(song) {
     .flat()
     .map(chordEntryToken)
     .filter((token) => parseChordToken(token));
+}
+
+function inspirationChordPreview(song) {
+  return inspirationChordTokens(song)
+    .slice(0, 4)
+    .map((token) => formatMusicText(token))
+    .join(" - ");
 }
 
 function chordSearchQualityFamily(quality) {
@@ -3737,6 +3811,8 @@ function setKeyFromCircleItem(item) {
   if (!matchingKey) return;
   state.key = matchingKey;
   keySelect.value = String(keyOptions.indexOf(matchingKey));
+  clearSelectedInspirationSong();
+  clearChordSequence();
   syncChordToKey();
   syncSongTheoryToChordTab();
   render();
@@ -3892,6 +3968,14 @@ function scrollToMobileChordDetail() {
   });
 }
 
+function scrollToKeyboardPanel() {
+  if (!shouldAutoFocusKeyboard() || !keyboardPanel) return;
+  requestAnimationFrame(() => {
+    const top = keyboardPanel.getBoundingClientRect().top + window.scrollY - 8;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  });
+}
+
 function focusActiveChordOnKeyboard() {
   if (!state.pendingKeyboardFocus) return;
   state.pendingKeyboardFocus = false;
@@ -3951,6 +4035,215 @@ function focusScaleOnKeyboard() {
   });
 }
 
+function scaleVideoLookupKey(key = state.key, scale = state.scale) {
+  return `${key.label}|${scale.id}`;
+}
+
+function youtubeEmbedUrl(videoValue) {
+  if (!videoValue) return "";
+  const value = String(videoValue).trim();
+  const watchMatch = value.match(/[?&]v=([^&]+)/);
+  const shortMatch = value.match(/youtu\.be\/([^?&]+)/);
+  const embedMatch = value.match(/youtube(?:-nocookie)?\.com\/embed\/([^?&/]+)/);
+  const id = embedMatch?.[1] || watchMatch?.[1] || shortMatch?.[1] || value;
+  if (!/^[\w-]{6,}$/.test(id)) return "";
+  return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1`;
+}
+
+function directVideoUrl(videoValue) {
+  const value = String(videoValue || "").trim();
+  if (!value) return "";
+  return /\.(mp4|webm|ogg)(?:[?#].*)?$/i.test(value) ? value : "";
+}
+
+function currentScaleVideo() {
+  const direct = scaleVideos[scaleVideoLookupKey()];
+  if (direct) return direct;
+  const enharmonic = keyOptions.find((key) => key.label === enharmonicKeyLabel(state.key.label));
+  if (enharmonic) return scaleVideos[scaleVideoLookupKey(enharmonic, state.scale)] || "";
+  return "";
+}
+
+function nootstudioScaleVideoHtml(source, title) {
+  return `
+    <div class="scale-video-frame nootstudio-video-player">
+      <video src="${escapeHtml(source)}" preload="metadata" playsinline></video>
+      <div class="scale-video-brand" aria-hidden="true">
+        <img src="assets/nootstudio-logo-zwart.png" alt="">
+      </div>
+      <button class="scale-video-big-play" type="button" aria-label="Speel ${escapeHtml(title)}">
+        <span aria-hidden="true"></span>
+      </button>
+      <div class="scale-video-controls">
+        <button class="scale-video-play" type="button" aria-label="Speel video">
+          <span aria-hidden="true"></span>
+        </button>
+        <div class="scale-video-progress-wrap">
+          <input class="scale-video-seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="Voortgang video">
+          <div class="scale-video-time">
+            <span>0:00</span>
+            <span>0:00</span>
+          </div>
+        </div>
+        <button class="scale-video-mute" type="button" aria-label="Geluid uit">
+          <span aria-hidden="true"></span>
+        </button>
+        <button class="scale-video-fullscreen" type="button" aria-label="Volledig scherm">
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function setupNootstudioScaleVideoPlayer(player) {
+  if (!player) return;
+  const video = player.querySelector("video");
+  const bigPlay = player.querySelector(".scale-video-big-play");
+  const playButton = player.querySelector(".scale-video-play");
+  const muteButton = player.querySelector(".scale-video-mute");
+  const fullscreenButton = player.querySelector(".scale-video-fullscreen");
+  const seek = player.querySelector(".scale-video-seek");
+  const [currentLabel, durationLabel] = player.querySelectorAll(".scale-video-time span");
+  let controlsHideTimer = null;
+  let touchControlsReady = false;
+  let touchControlsWereVisible = false;
+  const isTouchVideoMode = () => window.matchMedia?.("(hover: none), (pointer: coarse)").matches ?? false;
+  const hideControls = () => {
+    window.clearTimeout(controlsHideTimer);
+    controlsHideTimer = null;
+    player.classList.remove("controls-visible");
+    touchControlsReady = false;
+  };
+  const showControls = () => {
+    player.classList.add("controls-visible");
+    touchControlsReady = true;
+    window.clearTimeout(controlsHideTimer);
+    if (isTouchVideoMode()) {
+      controlsHideTimer = window.setTimeout(() => {
+        player.classList.remove("controls-visible");
+        touchControlsReady = false;
+      }, 2400);
+    }
+  };
+  const sync = () => {
+    const duration = video.duration || 0;
+    const progress = duration ? (video.currentTime / duration) * 100 : 0;
+    seek.value = String(progress);
+    seek.style.setProperty("--progress", `${progress}%`);
+    currentLabel.textContent = formatMediaTime(video.currentTime);
+    durationLabel.textContent = formatMediaTime(duration);
+  };
+  const togglePlayback = () => {
+    showControls();
+    if (video.paused) {
+      video.play();
+    } else {
+      video.pause();
+    }
+  };
+  bigPlay.addEventListener("click", togglePlayback);
+  playButton.addEventListener("click", togglePlayback);
+  video.addEventListener("click", () => {
+    if (isTouchVideoMode() && !touchControlsWereVisible) {
+      showControls();
+      return;
+    }
+    togglePlayback();
+  });
+  player.addEventListener("pointerenter", () => {
+    if (!isTouchVideoMode()) showControls();
+  });
+  player.addEventListener("pointerleave", () => {
+    if (!isTouchVideoMode()) hideControls();
+  });
+  player.addEventListener("pointerdown", () => {
+    if (isTouchVideoMode()) {
+      touchControlsWereVisible = touchControlsReady;
+      showControls();
+    }
+  });
+  seek.addEventListener("input", () => {
+    showControls();
+    const duration = video.duration || 0;
+    if (duration) video.currentTime = (Number(seek.value) / 100) * duration;
+    seek.style.setProperty("--progress", `${seek.value}%`);
+  });
+  muteButton.addEventListener("click", () => {
+    showControls();
+    video.muted = !video.muted;
+    player.classList.toggle("is-muted", video.muted);
+    muteButton.setAttribute("aria-label", video.muted ? "Geluid aan" : "Geluid uit");
+  });
+  fullscreenButton.addEventListener("click", () => {
+    showControls();
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      player.requestFullscreen?.();
+    }
+  });
+  video.addEventListener("loadedmetadata", sync);
+  video.addEventListener("timeupdate", sync);
+  video.addEventListener("play", () => {
+    player.classList.add("is-playing");
+    playButton.setAttribute("aria-label", "Pauzeer video");
+  });
+  video.addEventListener("pause", () => {
+    player.classList.remove("is-playing");
+    playButton.setAttribute("aria-label", "Speel video");
+  });
+  video.addEventListener("ended", () => {
+    player.classList.remove("is-playing");
+    hideControls();
+    sync();
+  });
+  sync();
+}
+
+function renderScaleVideo() {
+  if (!scaleVideoPanel || !scaleVideoDetails || !scaleVideoTitle || !scaleVideoSubtitle || !scaleVideoBody) return;
+  const title = `${state.key.label} ${state.scale.name} toonladder`;
+  const videoValue = currentScaleVideo();
+  const ownVideoUrl = directVideoUrl(videoValue);
+  const videoUrl = ownVideoUrl ? "" : youtubeEmbedUrl(videoValue);
+  scaleVideoTitle.innerHTML = formatMusicText(title);
+  const compact = shouldAutoFocusKeyboard();
+  const compactKey = compact ? "compact" : "wide";
+  if (scaleVideoDetails.dataset.mode !== compactKey) {
+    scaleVideoDetails.open = !compact;
+    scaleVideoDetails.dataset.mode = compactKey;
+  }
+  if (ownVideoUrl) {
+    scaleVideoPanel.classList.remove("empty");
+    scaleVideoSubtitle.textContent = "Speel mee met de Nootstudio video";
+    scaleVideoBody.innerHTML = nootstudioScaleVideoHtml(ownVideoUrl, title);
+    setupNootstudioScaleVideoPlayer(scaleVideoBody.querySelector(".nootstudio-video-player"));
+  } else if (videoUrl) {
+    scaleVideoPanel.classList.remove("empty");
+    scaleVideoSubtitle.textContent = "Bekijk hoe je deze toonladder speelt";
+    scaleVideoBody.innerHTML = `
+      <div class="scale-video-frame">
+        <iframe
+          src="${escapeHtml(videoUrl)}"
+          title="${escapeHtml(title)}"
+          loading="lazy"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen></iframe>
+      </div>
+    `;
+  } else {
+    scaleVideoPanel.classList.add("empty");
+    scaleVideoSubtitle.textContent = "Video volgt binnenkort";
+    scaleVideoBody.innerHTML = `
+      <div class="scale-video-placeholder">
+        <strong>${formatMusicText(title)}</strong>
+        <span>Voeg straks de YouTube-ID toe om deze lesvideo hier te tonen.</span>
+      </div>
+    `;
+  }
+}
+
 function scrollToMainKeyboard() {
   keyboardPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -3984,6 +4277,7 @@ function updateSummary(notes, scale) {
   pianoTitle.innerHTML = formatMusicText(chordSymbol(state.root, state.quality));
 
   noteStrip.innerHTML = "";
+  appendNoteStripHeading(chordSymbol(state.root, state.quality), state.inversion);
   [...notes].reverse().forEach((note) => {
     const pill = document.createElement("div");
     pill.className = "note-pill";
@@ -4095,6 +4389,15 @@ function addChordToSequence(chord) {
 
 function clearChordSequence() {
   state.chordSequence = [];
+}
+
+function clearSelectedInspirationSong() {
+  state.selectedInspirationSong = null;
+  state.selectedSongTransposeKey = null;
+  state.selectedModulationChord = null;
+  inspirationList?.querySelectorAll(".inspiration-card.selected").forEach((card) => {
+    card.classList.remove("selected");
+  });
 }
 
 function renderChordSequenceNotation() {
@@ -4380,7 +4683,7 @@ function updateChordNotationPanel(notes, title = "") {
   renderChordNotation(chordNotationStaff);
 }
 
-function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus = true } = {}) {
+function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus = true, scrollTarget = "detail" } = {}) {
   const matchingRoot = rootOptions.find((root) => root.label === chord.root)
     || rootOptions.find((root) => root.pitch === chord.rootPitch)
     || state.root;
@@ -4405,12 +4708,16 @@ function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus
   inversionSelect.value = String(state.inversion);
   render();
   if (focus && shouldAutoFocusKeyboard()) {
-    scrollToMobileChordDetail();
+    if (scrollTarget === "keyboard") {
+      scrollToKeyboardPanel();
+    } else {
+      scrollToMobileChordDetail();
+    }
   }
 }
 
 function selectDegreeChord(chord) {
-  applyDegreeChord(chord, { record: false });
+  applyDegreeChord(chord, { record: false, scrollTarget: "keyboard" });
 }
 
 function svgEl(name, attributes = {}) {
@@ -4579,6 +4886,7 @@ function renderGrid() {
 }
 
 function playNotes(notes) {
+  stopStandaloneAudioPlayback();
   const context = getAudioContext();
   const now = context.currentTime + 0.03;
   notes.forEach((note, index) => {
@@ -6225,6 +6533,7 @@ function render() {
     updateChordNotationPanel(notationNotes, notationTitle);
   }
   renderSelectedInspirationSong();
+  renderScaleVideo();
   renderFifthsCircle();
   syncAddSongKeyToCurrentScale();
   renderSongInspirations();
@@ -6246,6 +6555,7 @@ rootSelect.addEventListener("change", () => {
 
 keySelect.addEventListener("change", () => {
   state.key = keyOptions[Number(keySelect.value)];
+  clearSelectedInspirationSong();
   clearChordSequence();
   syncChordToKey();
   syncSongTheoryToChordTab();
@@ -6254,6 +6564,7 @@ keySelect.addEventListener("change", () => {
 
 scaleSelect.addEventListener("change", () => {
   state.scale = scales.find((scale) => scale.id === scaleSelect.value);
+  clearSelectedInspirationSong();
   clearChordSequence();
   syncChordToKey();
   syncSongTheoryToChordTab();

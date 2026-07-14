@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Piano Akkoorden</title>
-    <link rel="stylesheet" href="styles.css?v=20260713-ninth-chords">
+    <link rel="stylesheet" href="styles.css?v=20260714-scale-videos-1">
   </head>
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-live="polite">
@@ -161,6 +161,18 @@
               </label>
             </div>
               <div class="selected-song-chord-list" id="selectedSongChordList"></div>
+            </section>
+
+            <section class="scale-video-panel" id="scaleVideoPanel" aria-label="Video bij gekozen toonladder">
+              <div class="scale-video-card" id="scaleVideoDetails">
+                <div class="scale-video-heading">
+                  <span>
+                    <strong id="scaleVideoTitle">C majeur toonladder</strong>
+                    <em id="scaleVideoSubtitle">Video volgt binnenkort</em>
+                  </span>
+                </div>
+                <div class="scale-video-body" id="scaleVideoBody"></div>
+              </div>
             </section>
 
             <section class="library" aria-label="Alle akkoorden">
@@ -465,6 +477,6 @@
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260714-auth-gate"></script>
+    <script src="app.js?v=20260714-scale-videos-1"></script>
   </body>
 </html>
