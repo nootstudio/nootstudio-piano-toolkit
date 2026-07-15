@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Piano Akkoorden</title>
-    <link rel="stylesheet" href="styles.css?v=20260714-custom-mobile-controls-1">
+    <link rel="stylesheet" href="styles.css?v=20260715-mobile-title-menu-1">
   </head>
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-live="polite">
@@ -27,7 +27,10 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Piano</p>
-          <h1 id="appTitle">Akkoordenoverzicht</h1>
+          <h1 id="appTitle" class="brand-title">
+            <span>Nootstudio</span>
+            <span>piano toolkit</span>
+          </h1>
         </div>
         <div class="current-chord" aria-live="polite">
           <span id="currentName">C majeur</span>
@@ -43,6 +46,15 @@
         <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
         <button class="page-tab" data-page="song" type="button">Liedje</button>
         <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
+      </nav>
+      <button class="mobile-page-menu-button" id="mobilePageMenuButton" type="button" aria-label="Menu openen" aria-expanded="false" aria-controls="mobilePageMenu">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+      </button>
+      <nav class="mobile-page-menu" id="mobilePageMenu" aria-label="Mobiel menu" hidden>
+        <button class="mobile-page-menu-item active" data-page="chords" type="button">Akkoorden</button>
+        <button class="mobile-page-menu-item" data-page="custom" type="button">Zelf samenstellen</button>
       </nav>
 
       <section class="page-view active" data-page-view="chords">
@@ -426,9 +438,17 @@
             <div class="custom-builder-head">
               <div>
                 <h2>Zelf samenstellen</h2>
-                <span>Kies eerst een toonladder. Voeg daarna akkoorden toe aan de rechterkant van je reeks.</span>
+                <span>Kies eerst een toonladder. Voeg daarna akkoorden toe.</span>
               </div>
-              <button class="custom-print-button" id="customPrintButton" type="button">Print</button>
+              <div class="custom-builder-actions">
+                <div class="custom-zoom-control" aria-label="Zoom akkoordtegels">
+                  <span>Zoom</span>
+                  <button id="customZoomOut" type="button" aria-label="Zoom uit">-</button>
+                  <input id="customZoomRange" type="range" min="0.85" max="1.4" step="0.05" value="1" aria-label="Zoom akkoordtegels">
+                  <button id="customZoomIn" type="button" aria-label="Zoom in">+</button>
+                </div>
+                <button class="custom-print-button" id="customPrintButton" type="button">Print</button>
+              </div>
             </div>
 
             <div class="custom-scale-picker">
@@ -441,6 +461,8 @@
                 <select id="customScaleSelect"></select>
               </label>
             </div>
+
+            <div class="custom-scale-keyboard" id="customScaleKeyboard" aria-label="Gekozen toonladder op klavier"></div>
 
             <div class="custom-picker">
               <label>
@@ -477,6 +499,6 @@
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260714-custom-mobile-controls-1"></script>
+    <script src="app.js?v=20260715-mobile-title-menu-1"></script>
   </body>
 </html>

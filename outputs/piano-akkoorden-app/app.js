@@ -177,6 +177,7 @@ const customState = {
   root: rootOptions[0],
   quality: qualities[0],
   inversion: 0,
+  zoom: 1,
   chords: [],
   selectedIndex: null,
   isPrinting: false
@@ -572,6 +573,9 @@ const addSongMedia = document.querySelector("#addSongMedia");
 const addSongXml = document.querySelector("#addSongXml");
 const addSongStatus = document.querySelector("#addSongStatus");
 const pageTabs = document.querySelectorAll(".page-tab");
+const mobilePageMenuButton = document.querySelector("#mobilePageMenuButton");
+const mobilePageMenu = document.querySelector("#mobilePageMenu");
+const mobilePageMenuItems = document.querySelectorAll(".mobile-page-menu-item");
 const pageViews = document.querySelectorAll(".page-view");
 const songKeySelect = document.querySelector("#songKeySelect");
 const songScaleSelect = document.querySelector("#songScaleSelect");
@@ -606,6 +610,7 @@ const customArtistDisplay = document.querySelector("#customArtistDisplay");
 const customPrintScale = document.querySelector("#customPrintScale");
 const customKeySelect = document.querySelector("#customKeySelect");
 const customScaleSelect = document.querySelector("#customScaleSelect");
+const customScaleKeyboard = document.querySelector("#customScaleKeyboard");
 const customRootSelect = document.querySelector("#customRootSelect");
 const customQualitySelect = document.querySelector("#customQualitySelect");
 const customInversionSelect = document.querySelector("#customInversionSelect");
@@ -614,6 +619,9 @@ const customAddTypedChordButton = document.querySelector("#customAddTypedChordBu
 const customAddChordButton = document.querySelector("#customAddChordButton");
 const customResetButton = document.querySelector("#customResetButton");
 const customPrintButton = document.querySelector("#customPrintButton");
+const customZoomOut = document.querySelector("#customZoomOut");
+const customZoomIn = document.querySelector("#customZoomIn");
+const customZoomRange = document.querySelector("#customZoomRange");
 const customGrid = document.querySelector("#customGrid");
 const customExampleGrid = document.querySelector("#customExampleGrid");
 const authGate = document.querySelector("#authGate");
@@ -2018,6 +2026,25 @@ function majorScaleForKeyLabel(label) {
   return { key, scale: majorScale, notes: scaleNotes(key, majorScale) };
 }
 
+function contextualChromaticRootLabel(pitch, contextKeyLabel) {
+  const key = keyOptionFromLabel(contextKeyLabel) || state.key;
+  const relativePitch = mod(pitch - key.pitch, 12);
+  const borrowedMajorAccidentals = {
+    1: "flat",
+    3: "flat",
+    6: "sharp",
+    8: "flat",
+    10: "flat"
+  };
+  const preferredAccidental = borrowedMajorAccidentals[relativePitch]
+    || (key?.accidental === "sharp" ? "sharp" : "flat");
+  const uncommonRootLabels = new Set(["E#", "B#", "Cb", "Fb"]);
+  return rootOptions.find((root) => root.pitch === pitch && root.accidental === preferredAccidental && !uncommonRootLabels.has(root.label))?.label
+    || rootOptions.find((root) => root.pitch === pitch && root.accidental === "natural")?.label
+    || rootOptions.find((root) => root.pitch === pitch && !uncommonRootLabels.has(root.label))?.label
+    || chromaticLabels[pitch];
+}
+
 function keyPartsFromSongJsonLabel(label) {
   const text = String(label || "").trim();
   const match = text.match(/^(.+?)\s+(majeur|major|mineur|minor)$/i);
@@ -2052,11 +2079,8 @@ function labelForTransposedPitch(pitch, contextKeyLabel) {
   const contextScale = majorScaleForKeyLabel(contextKeyLabel);
   const scaleNote = contextScale.notes.find((note) => note.pitch === pitch);
   if (scaleNote) return scaleNote.label;
-  const contextKey = keyOptionFromLabel(contextKeyLabel) || state.key;
   return rootOptions.find((root) => root.pitch === pitch && root.accidental === "natural")?.label
-    || rootOptions.find((root) => root.pitch === pitch && root.accidental === contextKey.accidental && !["E#", "B#"].includes(root.label))?.label
-    || rootOptions.find((root) => root.pitch === pitch)?.label
-    || chromaticLabels[pitch];
+    || contextualChromaticRootLabel(pitch, contextKeyLabel);
 }
 
 function transposeKeyLabel(label, interval, targetContextLabel = null) {
@@ -2869,7 +2893,7 @@ function renderSongInspirations() {
   const keyText = `${state.key.label} ${group === "minor" ? "mineur" : state.scale.name}`;
   inspirationKeyLabel.innerHTML = searchingAllKeys
     ? `Zoeken in alle toonsoorten`
-    : `${formatMusicText(keyText)} - vaak goed te spelen in deze sfeer`;
+    : `${formatMusicText(keyText)} - oefen met deze toonladder`;
   inspirationList.innerHTML = "";
   if (inspirationStatus) inspirationStatus.textContent = "";
   inspirationFavoriteFilter?.classList.toggle("active", inspirationState.favoritesOnly);
@@ -2927,15 +2951,45 @@ function renderSongInspirations() {
   inspirationRefreshButton.hidden = true;
 }
 
+function chordTokensFromEntries(entries) {
+  return entries
+    .map(chordEntryToken)
+    .filter((token) => parseChordToken(token));
+}
+
+function measureChordEntries(measure) {
+  if (Array.isArray(measure)) return measure;
+  if (typeof measure !== "object" || measure === null) return [measure];
+  if (Array.isArray(measure.chords)) return measure.chords;
+  if (measure.token || measure.symbol || measure.chord || measure.name || measure.label) return [measure];
+  return [];
+}
+
+function sectionChordTokens(section) {
+  if (!section) return [];
+  if (Array.isArray(section.measures)) {
+    return chordTokensFromEntries(section.measures.flatMap(measureChordEntries));
+  }
+  if (Array.isArray(section.chords)) return chordTokensFromEntries(section.chords);
+  return [];
+}
+
+function sectionTitleText(section) {
+  return String(section?.title || section?.name || section?.label || section?.type || "").trim();
+}
+
+function inspirationChorusChordTokens(song) {
+  if (!Array.isArray(song?.sections)) return [];
+  const chorus = song.sections.find((section) => /^(chorus|refrein)\b/i.test(sectionTitleText(section)));
+  return sectionChordTokens(chorus);
+}
+
 function inspirationChordTokens(song) {
   if (Array.isArray(song?.sections)) {
-    return song.sections
-      .flatMap((section) => section.measures ? section.measures.flat() : (section.chords || []))
-      .map(chordEntryToken)
-      .filter((token) => parseChordToken(token));
+    return song.sections.flatMap(sectionChordTokens);
   }
   if (!song?.chords) return [];
-  if (Array.isArray(song.chords)) return song.chords.map(chordEntryToken).filter((token) => parseChordToken(token));
+  if (Array.isArray(song.chords)) return chordTokensFromEntries(song.chords);
   return parseMeasures(song.chords)
     .flatMap((part) => part.measures)
     .flat()
@@ -2944,7 +2998,9 @@ function inspirationChordTokens(song) {
 }
 
 function inspirationChordPreview(song) {
-  return inspirationChordTokens(song)
+  const chorusTokens = inspirationChorusChordTokens(song);
+  const tokens = chorusTokens.length ? chorusTokens : inspirationChordTokens(song);
+  return tokens
     .slice(0, 4)
     .map((token) => formatMusicText(token))
     .join(" - ");
@@ -3596,7 +3652,7 @@ function renderSelectedInspirationSong() {
           measureEl.append(nav);
         }
         measure.chords.forEach((token) => renderChordButton(token, measureEl, measureKeyLabel));
-        if (measure.repeatEnd && measure.repeatCount > 2) {
+        if (measure.repeatEnd && measure.repeatCount > 1) {
           measureEl.classList.add("has-repeat-badge");
           const repeatBadge = document.createElement("span");
           repeatBadge.className = "selected-repeat-badge";
@@ -3618,12 +3674,18 @@ function renderSelectedInspirationSong() {
 
 function setActivePage(page) {
   pageTabs.forEach((item) => item.classList.toggle("active", item.dataset.page === page));
+  mobilePageMenuItems.forEach((item) => item.classList.toggle("active", item.dataset.page === page));
   pageViews.forEach((view) => view.classList.toggle("active", view.dataset.pageView === page));
   appShell.classList.toggle("song-mode", page === "song");
   appShell.classList.toggle("custom-mode", page === "custom");
-  appTitle.textContent = page === "song"
-    ? "Liedje begeleiden"
-    : (page === "custom" ? "Zelf samenstellen" : "Akkoordenoverzicht");
+  mobilePageMenuButton?.setAttribute("aria-expanded", "false");
+  if (mobilePageMenu) mobilePageMenu.hidden = true;
+  appTitle.classList.toggle("brand-title", page === "chords");
+  if (page === "chords") {
+    appTitle.innerHTML = "<span>Nootstudio</span><span>piano toolkit</span>";
+  } else {
+    appTitle.textContent = page === "song" ? "Liedje begeleiden" : "Zelf samenstellen";
+  }
 }
 
 async function loadInspirationSongFile(song) {
@@ -4538,6 +4600,11 @@ function customInversionOptionsHtml(quality, selectedInversion) {
   `).join("");
 }
 
+function setCustomZoom(value) {
+  customState.zoom = Math.min(1.4, Math.max(0.85, Number(value) || 1));
+  renderCustomComposer();
+}
+
 function renderCustomComposer() {
   if (!customGrid) return;
   if (customKeySelect) customKeySelect.value = String(keyOptions.indexOf(customState.key));
@@ -4557,6 +4624,8 @@ function renderCustomComposer() {
   if (customArtistInput && customArtistInput.value !== customState.artist) customArtistInput.value = customState.artist;
   if (customTitleDisplay) customTitleDisplay.textContent = customState.title || "Titel";
   if (customArtistDisplay) customArtistDisplay.textContent = customState.artist || "";
+  if (customZoomRange && Number(customZoomRange.value) !== customState.zoom) customZoomRange.value = String(customState.zoom);
+  renderCustomScaleKeyboard();
   renderCustomPrintScale();
   if (customState.chords[0]) {
     const firstQuality = qualities.find((quality) => quality.id === customState.chords[0].qualityId) || customState.quality;
@@ -4571,6 +4640,7 @@ function renderCustomComposer() {
   renderCustomExamples();
 
   customGrid.innerHTML = "";
+  customGrid.style.setProperty("--custom-zoom", customState.zoom.toFixed(2));
   customGrid.classList.toggle("empty", customState.chords.length === 0);
   if (!customState.chords.length) {
     customGrid.textContent = "Kies, typ of klik op een voorbeeldakkoord om te beginnen.";
@@ -4586,6 +4656,7 @@ function renderCustomComposer() {
       <button class="custom-remove" type="button" aria-label="Verwijder ${formatMusicText(chord.symbol)}">×</button>
       <div class="custom-card-head">
         <strong>${formatMusicText(chord.symbol)}</strong>
+        <span class="custom-card-voicing">${formatMusicText(voicingLabel(chord.inversion))}</span>
         ${index === 0 ? `
           <label class="custom-start-voicing">
             Startligging
@@ -4631,6 +4702,12 @@ function renderCustomComposer() {
     });
     customGrid.append(card);
   });
+}
+
+function renderCustomScaleKeyboard() {
+  if (!customScaleKeyboard) return;
+  const notes = scaleNotes(customState.key, customState.scale);
+  customScaleKeyboard.innerHTML = scaleKeyboardHtml(notes, customState.key, customState.scale);
 }
 
 function renderCustomPrintScale() {
@@ -5166,7 +5243,7 @@ function parseMeasures(chordText) {
 
   const parts = [];
   let rest = trimmed;
-  const repeatPattern = /\|\|:?\s*([\s\S]*?)\s*:?\|\|\s*x([2-4])/i;
+  const repeatPattern = /\|\|:?\s*([\s\S]*?)\s*:?\|\|\s*x([2-9]\d*)/i;
   while (rest) {
     const repeatMatch = rest.match(repeatPattern);
     if (!repeatMatch) {
@@ -5282,7 +5359,7 @@ function importKeyAndScale(value) {
 function importSectionInfo(title) {
   const numberMatch = normalizeImportText(title).match(/\b(\d+)\b/);
   const normalized = normalizeImportText(title)
-    .replace(/\b(?:x[2-4]|repeat|herhaal)\b/g, "")
+    .replace(/\b(?:x[2-9]\d*|repeat|herhaal)\b/g, "")
     .replace(/^\d+\s+/, "")
     .replace(/\s+\d+$/, "")
     .replace(/\s+/g, " ")
@@ -5323,7 +5400,7 @@ function chordTokensFromLine(line) {
 
   const cleaned = line
     .replace(/[|:]/g, " ")
-    .replace(/\b(?:x[2-4]|repeat|herhaal)\b/gi, " ")
+    .replace(/\b(?:x[2-9]\d*|repeat|herhaal)\b/gi, " ")
     .trim();
   if (!cleaned) return [];
 
@@ -5530,7 +5607,8 @@ function musicXmlRepeatEndCount(measures) {
   const backward = measureList.flatMap((measure) => [...measure.querySelectorAll("barline repeat")])
     .find((repeat) => repeat.getAttribute("direction") === "backward");
   if (!backward) return 1;
-  return Math.max(2, Math.min(4, Number(backward.getAttribute("times") || 2)));
+  const count = Number(backward.getAttribute("times") || 2);
+  return Number.isFinite(count) && count > 1 ? Math.round(count) : 2;
 }
 
 function musicXmlEndingNumber(measures) {
@@ -5572,11 +5650,8 @@ function musicXmlRootLabelForPitch(pitch, keyLabel) {
   const scale = majorScaleForKeyLabel(keyLabel);
   const scaleNote = scale.notes.find((note) => note.pitch === pitch);
   if (scaleNote) return scaleNote.label;
-  const key = keyOptionFromLabel(keyLabel);
-  const accidental = key?.accidental === "sharp" ? "sharp" : "flat";
-  return rootOptions.find((root) => root.pitch === pitch && root.accidental === accidental)?.label
-    || rootOptions.find((root) => root.pitch === pitch)?.label
-    || chromaticLabels[pitch];
+  return rootOptions.find((root) => root.pitch === pitch && root.accidental === "natural")?.label
+    || contextualChromaticRootLabel(pitch, keyLabel);
 }
 
 function musicXmlInferChordFromNotes(notesInput, keyLabel) {
@@ -6737,6 +6812,9 @@ customChordText?.addEventListener("keydown", (event) => {
 customAddChordButton?.addEventListener("click", addCustomChord);
 customAddTypedChordButton?.addEventListener("click", addTypedCustomChord);
 customResetButton?.addEventListener("click", resetCustomChords);
+customZoomOut?.addEventListener("click", () => setCustomZoom(customState.zoom - 0.1));
+customZoomIn?.addEventListener("click", () => setCustomZoom(customState.zoom + 0.1));
+customZoomRange?.addEventListener("input", () => setCustomZoom(customZoomRange.value));
 
 authForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -6795,6 +6873,26 @@ pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setActivePage(tab.dataset.page);
   });
+});
+
+mobilePageMenuButton?.addEventListener("click", () => {
+  const isOpen = !mobilePageMenu?.hidden;
+  if (mobilePageMenu) mobilePageMenu.hidden = isOpen;
+  mobilePageMenuButton.setAttribute("aria-expanded", String(!isOpen));
+});
+
+mobilePageMenuItems.forEach((item) => {
+  item.addEventListener("click", () => {
+    setActivePage(item.dataset.page);
+  });
+});
+
+document.addEventListener("click", (event) => {
+  if (!mobilePageMenu || mobilePageMenu.hidden) return;
+  const target = event.target;
+  if (mobilePageMenu.contains(target) || mobilePageMenuButton?.contains(target)) return;
+  mobilePageMenu.hidden = true;
+  mobilePageMenuButton?.setAttribute("aria-expanded", "false");
 });
 
 songPrintButton.addEventListener("click", async () => {
