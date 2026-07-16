@@ -129,11 +129,15 @@ const state = {
   chordMode: "browse",
   searchNotes: [],
   selectedInspirationSong: null,
+  selectedInspirationLabel: null,
   selectedModulationChord: null,
   chordSequence: [],
   selectedSongTransposeKey: null,
   pendingKeyboardFocus: false,
-  libraryOpen: false
+  libraryOpen: false,
+  isAdmin: false,
+  currentUserEmail: "",
+  schemaEditMode: false
 };
 
 function defaultSongSections() {
@@ -528,6 +532,9 @@ const selectedSongArtist = document.querySelector("#selectedSongArtist");
 const selectedSongMeta = document.querySelector("#selectedSongMeta");
 const selectedSongTranspose = document.querySelector("#selectedSongTranspose");
 const selectedSongChordList = document.querySelector("#selectedSongChordList");
+const selectedSongAdminTools = document.querySelector("#selectedSongAdminTools");
+const songSchemaEditToggle = document.querySelector("#songSchemaEditToggle");
+const songSchemaEditor = document.querySelector("#songSchemaEditor");
 const scaleVideoPanel = document.querySelector("#scaleVideoPanel");
 const scaleVideoDetails = document.querySelector("#scaleVideoDetails");
 const scaleVideoTitle = document.querySelector("#scaleVideoTitle");
@@ -558,6 +565,7 @@ const inspirationSort = document.querySelector("#inspirationSort");
 const inspirationFavoriteFilter = document.querySelector("#inspirationFavoriteFilter");
 const librarySyncButton = document.querySelector("#librarySyncButton");
 const deleteSelectedSongButton = document.querySelector("#deleteSelectedSongButton");
+const adminOnlyElements = document.querySelectorAll("[data-admin-only]");
 const addSongForm = document.querySelector("#addSongForm");
 const addSongTitle = document.querySelector("#addSongTitle");
 const addSongArtist = document.querySelector("#addSongArtist");
@@ -2245,6 +2253,61 @@ function isLocalDevBypass() {
     || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
 }
 
+function clearAdminAccess() {
+  state.isAdmin = false;
+  state.currentUserEmail = "";
+  state.schemaEditMode = false;
+  updateAdminUi();
+}
+
+async function refreshAdminAccess(user = null) {
+  state.currentUserEmail = user?.email || "";
+  state.isAdmin = false;
+  if (isLocalDevBypass()) {
+    state.isAdmin = true;
+    state.currentUserEmail = "local-admin";
+    updateAdminUi();
+    return true;
+  }
+  if (authClient && user?.id) {
+    try {
+      const { data, error } = await authClient
+        .from("profiles")
+        .select("role,email")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!error && data?.role === "admin") {
+        state.isAdmin = true;
+        state.currentUserEmail = data.email || user.email || "";
+      }
+    } catch (error) {
+      console.warn("admin role check failed", error);
+    }
+  }
+  if (!state.isAdmin) state.schemaEditMode = false;
+  updateAdminUi();
+  return state.isAdmin;
+}
+
+function updateAdminUi() {
+  const isAdmin = Boolean(state.isAdmin);
+  adminOnlyElements.forEach((element) => {
+    element.hidden = !isAdmin;
+    element.classList.toggle("is-admin-hidden", !isAdmin);
+  });
+  if (deleteSelectedSongButton) {
+    deleteSelectedSongButton.hidden = !isAdmin || !state.selectedInspirationSong;
+  }
+  if (selectedSongAdminTools) {
+    selectedSongAdminTools.hidden = !isAdmin || !songHasChordData(state.selectedInspirationSong);
+  }
+  if (songSchemaEditToggle) {
+    songSchemaEditToggle.textContent = state.schemaEditMode ? "Sluit editor" : "Bewerk schema";
+  }
+  if (!isAdmin) state.schemaEditMode = false;
+  renderSongSchemaEditor();
+}
+
 async function claimCurrentUserEntitlements() {
   if (!authClient) return 0;
   const { data, error } = await authClient.rpc("claim_entitlements_for_current_user");
@@ -2262,12 +2325,14 @@ async function hasActiveEntitlement() {
 async function refreshAuthAccess({ showWelcome = false } = {}) {
   if (isLocalDevBypass()) {
     authAccessToken = remoteConfig.supabaseAnonKey || "";
+    await refreshAdminAccess();
     setAuthView("auth-unlocked");
     setAuthStatus("Lokale ontwikkelmodus actief.");
     return true;
   }
 
   if (!authClient) {
+    clearAdminAccess();
     setAuthView("auth-locked");
     setAuthStatus("Login is nog niet beschikbaar. Controleer de Supabase-instellingen.", true);
     return false;
@@ -2276,6 +2341,7 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
   setAuthView("auth-loading");
   const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
   if (sessionError) {
+    clearAdminAccess();
     setAuthView("auth-locked");
     setAuthStatus("Inloggen lukte niet. Probeer de link opnieuw.", true);
     return false;
@@ -2284,6 +2350,7 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
   const session = sessionData?.session;
   if (!session?.user) {
     authAccessToken = "";
+    clearAdminAccess();
     setAuthView("auth-locked");
     setAuthStatus("Log in met het e-mailadres waarmee de app is gekocht.");
     return false;
@@ -2292,8 +2359,10 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
   try {
     authAccessToken = session.access_token || "";
     await claimCurrentUserEntitlements();
-    const allowed = await hasActiveEntitlement();
+    const isAdmin = await refreshAdminAccess(session.user);
+    const allowed = isAdmin || await hasActiveEntitlement();
     if (!allowed) {
+      clearAdminAccess();
       setAuthView("auth-locked");
       setAuthStatus("Dit e-mailadres heeft nog geen actieve toegang. Controleer het e-mailadres van de bestelling.", true);
       return false;
@@ -2304,6 +2373,7 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
     loadRemoteSongLibrary();
     return true;
   } catch (error) {
+    clearAdminAccess();
     setAuthView("auth-locked");
     setAuthStatus("De toegang kon niet gecontroleerd worden. Probeer het zo opnieuw.", true);
     console.warn("auth access check failed", error);
@@ -2455,6 +2525,10 @@ async function deleteRemoteSong(label, song) {
 }
 
 async function syncLocalSongsOnline() {
+  if (!state.isAdmin) {
+    if (inspirationStatus) inspirationStatus.textContent = "Alleen beheerders kunnen synchroniseren.";
+    return;
+  }
   if (!remoteLibraryEnabled()) {
     if (inspirationStatus) inspirationStatus.textContent = "Online synchronisatie is nog niet ingesteld in app-config.js.";
     return;
@@ -2766,40 +2840,55 @@ function clearStoredYoutubeOnce(title, artist, migrationKey) {
   localStorage.setItem(migrationKey, "1");
 }
 
+function songHasValue(value) {
+  if (Array.isArray(value)) return value.length > 0;
+  return value !== undefined && value !== null && value !== "";
+}
+
+function songEntryForLabel(label, song) {
+  const localData = userSongsFromStorage();
+  const labels = [label, ...Object.keys(localData).filter((item) => item !== label)];
+  for (const itemLabel of labels) {
+    const found = (localData[itemLabel] || []).find((item) => songMatchesStoredItem(item, song));
+    if (found) return found;
+  }
+
+  const { group, keyLabel } = keyPartsFromSongJsonLabel(label);
+  const preferred = (songInspirations[group]?.[keyLabel] || []).find((item) => songMatchesStoredItem(item, song));
+  if (preferred) return preferred;
+
+  for (const groupName of Object.keys(songInspirations)) {
+    for (const songs of Object.values(songInspirations[groupName] || {})) {
+      const found = (songs || []).find((item) => songMatchesStoredItem(item, song));
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function mergeSongUpdate(existing, incoming) {
+  const base = normalizeSongJsonEntry(existing) || compactSongData(existing || {});
+  const update = compactSongData(normalizeSongJsonEntry(incoming) || incoming || {});
+  const merged = { ...base };
+  Object.entries(update).forEach(([key, value]) => {
+    if (key === "title" || key === "artist") return;
+    if (songHasValue(value)) merged[key] = value;
+  });
+  merged.title = update.title || base.title || "";
+  merged.artist = update.artist || base.artist || "";
+  return compactSongData(merged);
+}
+
 function addUserSong(label, song) {
   const data = userSongsFromStorage();
+  const existingSong = songEntryForLabel(label, song);
+  Object.keys(data).forEach((itemLabel) => {
+    data[itemLabel] = (data[itemLabel] || []).filter((item) => !songMatchesStoredItem(item, song));
+    if (!data[itemLabel].length) delete data[itemLabel];
+  });
   data[label] ||= [];
-  const index = data[label].findIndex((item) => songMatchesStoredItem(item, song));
-  const { group, keyLabel } = keyPartsFromSongJsonLabel(label);
-  const existingLibrarySong = (songInspirations[group]?.[keyLabel] || []).find((item) => songMatchesStoredItem(item, song));
-  const stored = compactSongData({
-    titel: song.title,
-    artiest: song.artist,
-    genre: song.style,
-    jaar: song.year,
-    niveau: song.level,
-    afbeelding: song.image,
-    youtube: song.youtube,
-    mediaKey: song.mediaKey,
-    mediaUrl: song.mediaUrl,
-    mediaType: song.mediaType,
-    mediaName: song.mediaName,
-    meter: song.meter,
-    sections: song.sections
-  });
-  stored.youtube = song.youtube || "";
-  const nextStored = compactSongData({
-    ...(existingLibrarySong || {}),
-    ...(index >= 0 ? data[label][index] : {}),
-    ...stored,
-    titel: song.title,
-    artiest: song.artist
-  });
-  if (index >= 0) {
-    data[label][index] = nextStored;
-  } else {
-    data[label].push(nextStored);
-  }
+  const nextStored = mergeSongUpdate(existingSong, song);
+  data[label].push(nextStored);
   data[label] = sortSongsByTitle(data[label]);
   saveUserSongs(data);
   mergeSongJsonLibrary(data);
@@ -2851,10 +2940,13 @@ function hideBuiltInSong(label, song) {
   saveHiddenSongs(data);
   if (state.selectedInspirationSong?.title === song.title && state.selectedInspirationSong?.artist === song.artist) {
     state.selectedInspirationSong = null;
+    state.selectedInspirationLabel = null;
+    state.schemaEditMode = false;
   }
 }
 
 function removeInspirationSong(label, song) {
+  if (!state.isAdmin) return;
   if (isUserSong(song, label)) {
     removeUserSong(label, song);
   } else {
@@ -2864,13 +2956,17 @@ function removeInspirationSong(label, song) {
 }
 
 function deleteSelectedInspirationSong() {
+  if (!state.isAdmin) return;
   const song = state.selectedInspirationSong;
   if (!song) {
     if (addSongStatus) addSongStatus.textContent = "Selecteer eerst een liedje om te verwijderen.";
     return;
   }
-  const label = currentSongLibraryLabel();
+  const label = state.selectedInspirationLabel || currentSongLibraryLabel();
   removeInspirationSong(label, song);
+  state.selectedInspirationSong = null;
+  state.selectedInspirationLabel = null;
+  state.schemaEditMode = false;
   render();
   if (addSongStatus) addSongStatus.textContent = `${song.title} is verwijderd uit ${label}.`;
 }
@@ -2978,6 +3074,57 @@ function measureChordEntries(measure) {
   if (Array.isArray(measure.chords)) return measure.chords;
   if (measure.token || measure.symbol || measure.chord || measure.name || measure.label) return [measure];
   return [];
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(String(value ?? "")).replace(/"/g, "&quot;");
+}
+
+function editableSongSections(song) {
+  return Array.isArray(song?.sections) ? song.sections : [];
+}
+
+function editableSectionMeasures(section) {
+  if (Array.isArray(section?.measures)) return section.measures;
+  if (Array.isArray(section?.chords)) return [{ chords: section.chords }];
+  return [];
+}
+
+function chordEntryWithToken(entry, token) {
+  const value = String(token || "").trim();
+  if (!value) return "";
+  if (typeof entry === "string" || typeof entry === "number") return value;
+  if (typeof entry !== "object" || entry === null) return value;
+  const next = { ...entry };
+  if ("token" in next) next.token = value;
+  else if ("symbol" in next) next.symbol = value;
+  else if ("chord" in next) next.chord = value;
+  else if ("name" in next) next.name = value;
+  else if ("label" in next) next.label = value;
+  else next.token = value;
+  return next;
+}
+
+function setEditableMeasureChords(measure, chords) {
+  if (Array.isArray(measure)) return chords;
+  if (typeof measure === "object" && measure !== null) return { ...measure, chords };
+  return { chords };
+}
+
+function schemaChordRowHtml(sectionIndex, measureIndex, originalIndex, token = "") {
+  return `
+    <div class="schema-chord-row" data-section-index="${sectionIndex}" data-measure-index="${measureIndex}" data-original-index="${originalIndex}">
+      <input type="text" value="${escapeAttribute(token)}" aria-label="Akkoord">
+      <button type="button" class="schema-remove-chord" data-schema-action="remove-chord" aria-label="Verwijder akkoord">×</button>
+    </div>`;
+}
+
+function measureNumberText(measure, index) {
+  return String(measure?.measureNumber || measure?.number || measure?.bar || index + 1);
+}
+
+function sectionNameText(section, index) {
+  return section?.title || section?.name || section?.label || section?.type || `Deel ${index + 1}`;
 }
 
 function sectionChordTokens(section) {
@@ -3500,7 +3647,11 @@ function renderSelectedInspirationSong() {
   const hasMedia = Boolean(song && (song.mediaKey || song.mediaUrl || song.youtube));
   const hasChordData = songHasChordData(song);
   selectedSongChords.hidden = !song || (!hasMedia && !hasChordData);
-  if (!song) return;
+  if (!song) {
+    state.schemaEditMode = false;
+    updateAdminUi();
+    return;
+  }
 
   selectedSongTitle.textContent = song.title;
   if (selectedSongArtist) selectedSongArtist.textContent = song.artist || "";
@@ -3549,6 +3700,7 @@ function renderSelectedInspirationSong() {
     : inspirationChordTokens(song).map((token) => transposeChordEntry(token, interval, fallbackKey));
   if (!tokens.length) {
     selectedSongChords.hidden = !hasMedia;
+    updateAdminUi();
     return;
   }
 
@@ -3690,10 +3842,156 @@ function renderSelectedInspirationSong() {
       part.append(title, row);
       selectedSongChordList.append(part);
     });
+    updateAdminUi();
     return;
   }
 
   tokens.forEach((token) => renderChordButton(token, selectedSongChordList));
+  updateAdminUi();
+}
+
+function renderSongSchemaEditor() {
+  if (!songSchemaEditor) return;
+  const song = state.selectedInspirationSong;
+  const canEdit = state.isAdmin && state.schemaEditMode && songHasChordData(song);
+  songSchemaEditor.hidden = !canEdit;
+  if (!canEdit) {
+    songSchemaEditor.innerHTML = "";
+    return;
+  }
+  const sections = editableSongSections(song);
+  const sectionsHtml = sections.map((section, sectionIndex) => {
+    const measures = editableSectionMeasures(section);
+    if (!measures.length) return "";
+    const measureCards = measures.map((measure, measureIndex) => {
+      const entries = measureChordEntries(measure);
+      const rows = entries
+        .map((entry, chordIndex) => schemaChordRowHtml(sectionIndex, measureIndex, chordIndex, chordEntryToken(entry)))
+        .join("");
+      return `
+        <article class="schema-measure-card" data-section-index="${sectionIndex}" data-measure-index="${measureIndex}">
+          <div class="schema-measure-head">
+            <strong>Maat ${escapeHtml(measureNumberText(measure, measureIndex))}</strong>
+            <button type="button" class="schema-add-chord" data-schema-action="add-chord">+ akkoord</button>
+          </div>
+          <div class="schema-chord-rows">${rows || '<span class="schema-empty-measure">Geen akkoord</span>'}</div>
+        </article>`;
+    }).join("");
+    return `
+      <section class="schema-section">
+        <h5>${escapeHtml(sectionNameText(section, sectionIndex))}</h5>
+        <div class="schema-measure-grid">${measureCards}</div>
+      </section>`;
+  }).join("");
+  songSchemaEditor.innerHTML = `
+    <div class="schema-editor-head">
+      <div>
+        <h4>Akkoordenschema bewerken</h4>
+        <p>Maatsoort, secties en herhalingstekens blijven intact.</p>
+      </div>
+      <div class="schema-editor-actions">
+        <button type="button" class="schema-save-button" data-schema-action="save-schema">Opslaan</button>
+        <button type="button" class="schema-cancel-button" data-schema-action="cancel-schema">Annuleren</button>
+      </div>
+    </div>
+    <div class="schema-editor-sections">${sectionsHtml || '<p class="schema-editor-note">Geen maten gevonden om te bewerken.</p>'}</div>`;
+}
+
+function cloneSongForSchemaEdit(song) {
+  return JSON.parse(JSON.stringify(song || {}));
+}
+
+function handleSongSchemaEditorClick(event) {
+  const button = event.target.closest("[data-schema-action]");
+  if (!button || !songSchemaEditor?.contains(button) || !state.isAdmin) return;
+  const action = button.dataset.schemaAction;
+  if (action === "cancel-schema") {
+    state.schemaEditMode = false;
+    renderSelectedInspirationSong();
+    return;
+  }
+  if (action === "save-schema") {
+    handleSaveSongSchemaEdits();
+    return;
+  }
+  if (action === "remove-chord") {
+    const row = button.closest(".schema-chord-row");
+    const rows = row?.parentElement;
+    row?.remove();
+    if (rows && !rows.querySelector(".schema-chord-row")) {
+      rows.innerHTML = '<span class="schema-empty-measure">Geen akkoord</span>';
+    }
+    return;
+  }
+  if (action === "add-chord") {
+    const card = button.closest(".schema-measure-card");
+    const rows = card?.querySelector(".schema-chord-rows");
+    if (!card || !rows) return;
+    rows.querySelector(".schema-empty-measure")?.remove();
+    rows.insertAdjacentHTML("beforeend", schemaChordRowHtml(card.dataset.sectionIndex, card.dataset.measureIndex, -1, ""));
+    rows.querySelector(".schema-chord-row:last-child input")?.focus();
+  }
+}
+
+function buildEditedSongFromSchemaForm(song) {
+  const nextSong = cloneSongForSchemaEdit(song);
+  const sections = editableSongSections(nextSong);
+  const rowsByMeasure = new Map();
+  songSchemaEditor?.querySelectorAll(".schema-chord-row").forEach((row) => {
+    const key = `${row.dataset.sectionIndex}:${row.dataset.measureIndex}`;
+    const value = row.querySelector("input")?.value.trim() || "";
+    if (!rowsByMeasure.has(key)) rowsByMeasure.set(key, []);
+    if (value) rowsByMeasure.get(key).push({
+      originalIndex: Number(row.dataset.originalIndex),
+      token: value
+    });
+  });
+  sections.forEach((section, sectionIndex) => {
+    const originalHadChordList = !Array.isArray(section.measures) && Array.isArray(section.chords);
+    const measures = editableSectionMeasures(section);
+    const nextMeasures = measures.map((measure, measureIndex) => {
+      const originalEntries = measureChordEntries(measure);
+      const edits = rowsByMeasure.get(`${sectionIndex}:${measureIndex}`) || [];
+      const chords = edits.map((edit) => {
+        const original = edit.originalIndex >= 0 ? originalEntries[edit.originalIndex] : null;
+        return chordEntryWithToken(original, edit.token);
+      }).filter(Boolean);
+      return setEditableMeasureChords(measure, chords);
+    });
+    if (originalHadChordList && nextMeasures.length === 1) {
+      section.chords = nextMeasures[0].chords || [];
+    } else {
+      section.measures = nextMeasures;
+      delete section.chords;
+    }
+  });
+  nextSong.sections = sections;
+  nextSong.editedAt = new Date().toISOString();
+  nextSong.editedBy = state.currentUserEmail || "admin";
+  return nextSong;
+}
+
+async function handleSaveSongSchemaEdits() {
+  const song = state.selectedInspirationSong;
+  if (!state.isAdmin || !song) return;
+  const label = state.selectedInspirationLabel || currentSongLibraryLabel();
+  const editedSong = buildEditedSongFromSchemaForm(song);
+  const localSong = addUserSong(label, editedSong) || editedSong;
+  let remoteSaveFailed = false;
+  const remoteSong = await saveRemoteSong(label, localSong).catch((error) => {
+    console.warn("schema edit remote save failed", error);
+    remoteSaveFailed = true;
+    return null;
+  });
+  state.selectedInspirationSong = remoteSong || localSong;
+  state.selectedInspirationLabel = label;
+  state.schemaEditMode = false;
+  render();
+  if (inspirationStatus) {
+    inspirationStatus.textContent = remoteSaveFailed
+      ? "Het schema is lokaal opgeslagen, maar online opslaan is niet gelukt."
+      : "Het akkoordenschema is opgeslagen.";
+  }
 }
 
 function setActivePage(page) {
@@ -3733,9 +4031,12 @@ async function loadInspirationSongFile(song) {
 }
 
 async function selectInspirationSong(card, song, libraryLabel = null) {
-  const selectedSong = songWithLibraryKey(song, libraryLabel);
+  const label = libraryLabel || currentSongLibraryLabel();
+  const selectedSong = songWithLibraryKey(song, label);
   state.selectedInspirationSong = selectedSong;
+  state.selectedInspirationLabel = label;
   state.selectedSongTransposeKey = null;
+  state.schemaEditMode = false;
   clearChordSequence();
   renderChordSequence();
   inspirationList.querySelectorAll(".inspiration-card").forEach((item) => {
@@ -3822,6 +4123,10 @@ async function songFromAddForm() {
 
 async function handleAddSongSubmit(event) {
   event.preventDefault();
+  if (!state.isAdmin) {
+    if (addSongStatus) addSongStatus.textContent = "Alleen beheerders kunnen liedjes toevoegen.";
+    return;
+  }
   if (!addSongTitle.value.trim() || !addSongArtist.value.trim()) return;
   try {
     const label = addSongKey.value || `${state.key.label} majeur`;
@@ -3834,7 +4139,9 @@ async function handleAddSongSubmit(event) {
     });
     applySongKeyLabel(label);
     state.selectedInspirationSong = remoteSong || savedSong;
+    state.selectedInspirationLabel = label;
     state.selectedSongTransposeKey = null;
+    state.schemaEditMode = false;
     render();
     addSongForm.reset();
     syncAddSongKeyToCurrentScale();
@@ -6903,6 +7210,14 @@ librarySyncButton?.addEventListener("click", () => {
 
 deleteSelectedSongButton?.addEventListener("click", deleteSelectedInspirationSong);
 
+songSchemaEditToggle?.addEventListener("click", () => {
+  if (!state.isAdmin) return;
+  state.schemaEditMode = !state.schemaEditMode;
+  renderSelectedInspirationSong();
+});
+
+songSchemaEditor?.addEventListener("click", handleSongSchemaEditorClick);
+
 let studentCodeInputTimer;
 studentCodeInput?.addEventListener("input", () => {
   window.clearTimeout(studentCodeInputTimer);
@@ -7131,9 +7446,20 @@ songArtistInput.addEventListener("input", () => {
   songArtistDisplay.textContent = songState.artist;
 });
 
-songImportButton.addEventListener("click", applySongImport);
+songImportButton.addEventListener("click", () => {
+  if (!state.isAdmin) {
+    if (songImportStatus) songImportStatus.textContent = "Alleen beheerders kunnen liedjes importeren.";
+    return;
+  }
+  applySongImport();
+});
 
 songXmlInput.addEventListener("change", () => {
+  if (!state.isAdmin) {
+    songXmlInput.value = "";
+    if (songImportStatus) songImportStatus.textContent = "Alleen beheerders kunnen MusicXML importeren.";
+    return;
+  }
   const [file] = songXmlInput.files;
   if (!file) return;
   applyMusicXmlImport(file);

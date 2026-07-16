@@ -194,6 +194,10 @@
               <select id="selectedSongTranspose"></select>
             </label>
           </div>
+          <div class="selected-song-admin-tools" id="selectedSongAdminTools" data-admin-only hidden>
+            <button class="song-schema-edit-toggle" id="songSchemaEditToggle" type="button">Bewerk schema</button>
+          </div>
+          <div class="song-schema-editor" id="songSchemaEditor" data-admin-only hidden></div>
           <div class="selected-song-chord-list" id="selectedSongChordList"></div>
         </section>
         <div class="floating-chord" id="floatingChord" hidden></div>
@@ -223,7 +227,7 @@
             <button class="inspiration-favorite-filter" id="inspirationFavoriteFilter" type="button">Favorieten</button>
           </div>
           <div class="inspiration-list" id="inspirationList"></div>
-          <details class="song-add-panel">
+          <details class="song-add-panel" data-admin-only hidden>
             <summary>Liedje toevoegen</summary>
             <form class="song-add-form" id="addSongForm">
               <div class="song-add-grid">
@@ -274,8 +278,8 @@
               </div>
               <div class="song-add-actions">
                 <button type="submit">Voeg liedje toe</button>
-                <button class="library-sync-button" id="librarySyncButton" type="button">Sync online</button>
-                <button class="song-delete-selected-button" id="deleteSelectedSongButton" type="button">Verwijder geselecteerd</button>
+                <button class="library-sync-button" id="librarySyncButton" type="button" data-admin-only hidden>Sync online</button>
+                <button class="song-delete-selected-button" id="deleteSelectedSongButton" type="button" data-admin-only hidden>Verwijder geselecteerd</button>
               </div>
               <p id="addSongStatus" aria-live="polite"></p>
             </form>
@@ -343,7 +347,7 @@
             </button>
           </div>
 
-          <section class="song-import" aria-label="Liedje importeren">
+          <section class="song-import" aria-label="Liedje importeren" data-admin-only hidden>
             <div class="section-heading">
               <h2>Liedje importeren</h2>
             </div>
