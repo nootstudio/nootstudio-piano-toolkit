@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Piano Akkoorden</title>
-    <link rel="stylesheet" href="styles.css?v=20260715-mobile-title-menu-1">
+  <link rel="stylesheet" href="styles.css?v=20260715-logo-video-2">
   </head>
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-live="polite">
@@ -26,27 +26,17 @@
     <main class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Piano</p>
-          <h1 id="appTitle" class="brand-title">
-            <span>Nootstudio</span>
-            <span>piano toolkit</span>
+          <h1 id="appTitle" class="brand-title brand-title-logo">
+            <img class="brand-logo" src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="Nootstudio piano toolkit">
           </h1>
         </div>
-        <div class="current-chord" aria-live="polite">
-          <span id="currentName">C majeur</span>
-          <strong id="currentNotes">C - E - G</strong>
-          <button class="play-button" id="playChordButton" type="button" aria-label="Speel akkoord">
-            <span aria-hidden="true"></span>
-          </button>
-          <button class="auth-logout" id="authLogout" type="button" hidden>Uitloggen</button>
-        </div>
+        <nav class="page-tabs" aria-label="Pagina's">
+          <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
+          <button class="page-tab" data-page="song" type="button">Liedje</button>
+          <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
+        </nav>
       </header>
 
-      <nav class="page-tabs" aria-label="Pagina's">
-        <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
-        <button class="page-tab" data-page="song" type="button">Liedje</button>
-        <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
-      </nav>
       <button class="mobile-page-menu-button" id="mobilePageMenuButton" type="button" aria-label="Menu openen" aria-expanded="false" aria-controls="mobilePageMenu">
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
@@ -55,6 +45,7 @@
       <nav class="mobile-page-menu" id="mobilePageMenu" aria-label="Mobiel menu" hidden>
         <button class="mobile-page-menu-item active" data-page="chords" type="button">Akkoorden</button>
         <button class="mobile-page-menu-item" data-page="custom" type="button">Zelf samenstellen</button>
+        <button class="mobile-page-menu-item mobile-auth-logout" id="mobileAuthLogout" type="button" hidden>Uitloggen</button>
       </nav>
 
       <section class="page-view active" data-page-view="chords">
@@ -129,6 +120,17 @@
           </aside>
 
           <section class="keyboard-panel" aria-label="Pianoklavier">
+            <div class="current-chord" aria-live="polite">
+              <div class="current-chord-copy">
+                <span id="currentName">C majeur</span>
+                <strong id="currentNotes">C - E - G</strong>
+                <button class="play-button" id="playChordButton" type="button" aria-label="Speel akkoord">
+                  <span aria-hidden="true"></span>
+                </button>
+                <button class="auth-logout" id="authLogout" type="button" hidden>Uitloggen</button>
+              </div>
+              <div class="chord-notation-staff song-notation" id="chordNotationStaff" aria-hidden="true"></div>
+            </div>
             <div class="keyboard-header">
               <h2 id="pianoTitle">C majeur</h2>
               <div class="toggle-row" role="group" aria-label="Weergave">
@@ -153,28 +155,6 @@
               <div class="chord-sequence-notation" id="chordSequenceNotation" aria-label="Akkoordreeks op de notenbalk"></div>
               <div class="chord-sequence-results" id="chordSequenceResults" aria-live="polite"></div>
             </section>
-            <section class="chord-notation-panel" aria-label="Noten van gekozen akkoord">
-              <div>
-                <h3>Noten op de notenbalk</h3>
-                <span id="chordNotationTitle">C</span>
-              </div>
-              <div class="chord-notation-staff song-notation" id="chordNotationStaff" aria-hidden="true"></div>
-            </section>
-            <section class="selected-song-chords" id="selectedSongChords" aria-label="Akkoorden van gekozen lied" hidden>
-              <div class="selected-song-head">
-              <div>
-                <h3 id="selectedSongTitle">Gekozen lied</h3>
-                <span class="selected-song-artist" id="selectedSongArtist"></span>
-                <span class="selected-song-meta" id="selectedSongMeta"></span>
-              </div>
-              <label class="selected-song-transpose">
-                Transponeer naar
-                <select id="selectedSongTranspose"></select>
-              </label>
-            </div>
-              <div class="selected-song-chord-list" id="selectedSongChordList"></div>
-            </section>
-
             <section class="scale-video-panel" id="scaleVideoPanel" aria-label="Video bij gekozen toonladder">
               <div class="scale-video-card" id="scaleVideoDetails">
                 <div class="scale-video-heading">
@@ -201,6 +181,20 @@
               </div>
             </section>
           </section>
+        </section>
+        <section class="selected-song-chords" id="selectedSongChords" aria-label="Akkoorden van gekozen lied" hidden>
+          <div class="selected-song-head">
+            <div>
+              <h3 id="selectedSongTitle">Gekozen lied</h3>
+              <span class="selected-song-artist" id="selectedSongArtist"></span>
+              <span class="selected-song-meta" id="selectedSongMeta"></span>
+            </div>
+            <label class="selected-song-transpose">
+              Transponeer naar
+              <select id="selectedSongTranspose"></select>
+            </label>
+          </div>
+          <div class="selected-song-chord-list" id="selectedSongChordList"></div>
         </section>
         <div class="floating-chord" id="floatingChord" hidden></div>
         <section class="song-inspiration" aria-label="Liedjes bij deze toonladder">
@@ -430,67 +424,81 @@
               <strong id="customTitleDisplay">Titel</strong>
               <span id="customArtistDisplay"></span>
             </div>
-            <img class="custom-print-logo" src="assets/nootstudio-logo-zwart-crop.png" alt="Nootstudio">
+            <img class="custom-print-logo" src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="Nootstudio piano toolkit">
             <div class="custom-print-scale" id="customPrintScale" aria-hidden="true"></div>
           </section>
 
           <section class="custom-builder-card" aria-label="Akkoorden zelf samenstellen">
-            <div class="custom-builder-head">
-              <div>
-                <h2>Zelf samenstellen</h2>
-                <span>Kies eerst een toonladder. Voeg daarna akkoorden toe.</span>
-              </div>
-              <div class="custom-builder-actions">
-                <div class="custom-zoom-control" aria-label="Zoom akkoordtegels">
-                  <span>Zoom</span>
-                  <button id="customZoomOut" type="button" aria-label="Zoom uit">-</button>
-                  <input id="customZoomRange" type="range" min="0.85" max="1.4" step="0.05" value="1" aria-label="Zoom akkoordtegels">
-                  <button id="customZoomIn" type="button" aria-label="Zoom in">+</button>
+            <div class="custom-step custom-step-scale">
+              <div class="custom-step-number" aria-hidden="true">1</div>
+              <div class="custom-step-content">
+                <h2>Kies toonsoort</h2>
+                <div class="custom-scale-picker">
+                  <label>
+                    Toonladder
+                    <select id="customKeySelect"></select>
+                  </label>
+                  <label>
+                    Soort toonladder
+                    <select id="customScaleSelect"></select>
+                  </label>
                 </div>
+
+                <div class="custom-scale-keyboard" id="customScaleKeyboard" aria-label="Gekozen toonladder op klavier"></div>
+              </div>
+            </div>
+
+            <div class="custom-step custom-step-compose">
+              <div class="custom-step-number" aria-hidden="true">2</div>
+              <div class="custom-step-content">
+                <h2>Kies je akkoord</h2>
+                <div class="custom-example-panel" aria-label="Voorbeeldakkoorden uit de toonladder">
+                  <h3>Akkoorden uit de toonladder</h3>
+                  <p>Deze akkoorden passen mooi in jouw gekozen toonladder.</p>
+                  <div class="custom-example-grid" id="customExampleGrid"></div>
+                </div>
+                <div class="custom-picker">
+                  <label>
+                    Grondtoon
+                    <select id="customRootSelect"></select>
+                  </label>
+                  <label>
+                    Akkoord
+                    <select id="customQualitySelect"></select>
+                  </label>
+                  <button id="customAddChordButton" type="button">Voeg toe</button>
+                  <button id="customResetButton" type="button">Reset</button>
+                </div>
+
+                <div class="custom-text-add">
+                  <label>
+                    Akkoord typen
+                    <input id="customChordText" type="text" autocomplete="off" placeholder="Bijv. C, Dm7, F#maj9">
+                  </label>
+                  <button id="customAddTypedChordButton" type="button">Voeg toe</button>
+                </div>
+
+                <div class="custom-chord-workspace">
+                  <div class="custom-chord-workspace-head">
+                    <h3>Jouw akkoorden</h3>
+                    <div class="custom-zoom-control" aria-label="Zoom akkoordtegels">
+                      <span>Zoom</span>
+                      <button id="customZoomOut" type="button" aria-label="Zoom uit">-</button>
+                      <input id="customZoomRange" type="range" min="0.85" max="1.4" step="0.05" value="1" aria-label="Zoom akkoordtegels">
+                      <button id="customZoomIn" type="button" aria-label="Zoom in">+</button>
+                    </div>
+                  </div>
+                  <div class="custom-grid" id="customGrid" aria-live="polite"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="custom-step custom-step-print">
+              <div class="custom-step-number" aria-hidden="true">3</div>
+              <div class="custom-step-content custom-print-step-content">
                 <button class="custom-print-button" id="customPrintButton" type="button">Print</button>
               </div>
             </div>
-
-            <div class="custom-scale-picker">
-              <label>
-                Toonladder
-                <select id="customKeySelect"></select>
-              </label>
-              <label>
-                Soort toonladder
-                <select id="customScaleSelect"></select>
-              </label>
-            </div>
-
-            <div class="custom-scale-keyboard" id="customScaleKeyboard" aria-label="Gekozen toonladder op klavier"></div>
-
-            <div class="custom-picker">
-              <label>
-                Grondtoon
-                <select id="customRootSelect"></select>
-              </label>
-              <label>
-                Akkoord
-                <select id="customQualitySelect"></select>
-              </label>
-              <button id="customAddChordButton" type="button">Voeg toe</button>
-              <button id="customResetButton" type="button">Reset</button>
-            </div>
-
-            <div class="custom-text-add">
-              <label>
-                Akkoord typen
-                <input id="customChordText" type="text" autocomplete="off" placeholder="Bijv. C, Dm7, F#maj9">
-              </label>
-              <button id="customAddTypedChordButton" type="button">Voeg toe</button>
-            </div>
-
-            <div class="custom-example-panel" aria-label="Voorbeeldakkoorden uit de toonladder">
-              <h3>Akkoorden uit de toonladder</h3>
-              <div class="custom-example-grid" id="customExampleGrid"></div>
-            </div>
-
-            <div class="custom-grid" id="customGrid" aria-live="polite"></div>
           </section>
         </section>
       </section>
@@ -499,6 +507,6 @@
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260715-mobile-title-menu-1"></script>
+    <script src="app.js?v=20260715-logo-local-1"></script>
   </body>
 </html>

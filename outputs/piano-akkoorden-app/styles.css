@@ -139,16 +139,19 @@ select {
 }
 
 .app-shell {
+  position: relative;
   width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 24px 0 40px;
 }
 
 .topbar {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
+  min-height: 132px;
   padding: 14px 0 22px;
 }
 
@@ -160,6 +163,20 @@ select {
   row-gap: 0;
   max-width: min(760px, 100%);
   line-height: 0.92;
+}
+
+.brand-title-logo {
+  align-items: center;
+  max-width: min(430px, 42vw);
+  line-height: 1;
+}
+
+.brand-logo {
+  display: block;
+  width: min(420px, 41vw);
+  max-height: 188px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brand-title span:first-child {
@@ -174,13 +191,16 @@ select {
 
 .page-tabs {
   display: inline-grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, max-content);
   gap: 4px;
-  margin: 0 0 18px;
+  position: static;
+  flex: 0 0 auto;
+  margin: 16px 0 0 auto;
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255,255,255,0.72);
+  z-index: 3;
 }
 
 .page-tab {
@@ -243,12 +263,30 @@ h2 {
 }
 
 .current-chord {
-  min-width: min(360px, 42vw);
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px);
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  margin: 0 0 14px;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255,255,255,0.82);
   box-shadow: 0 10px 28px rgba(31, 36, 42, 0.08);
+}
+
+.current-chord-copy {
+  min-width: 0;
+}
+
+.current-chord .chord-notation-staff {
+  justify-self: end;
+  width: min(100%, 220px);
+  min-height: 96px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .app-shell.song-mode .current-chord {
@@ -277,6 +315,13 @@ h2 {
   font-size: clamp(1.65rem, 3vw, 2.35rem);
   font-weight: 950;
   line-height: 1;
+}
+
+.current-chord .scale-summary-symbol {
+  color: #951b81;
+  font-family: inherit;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 950;
 }
 
 .current-chord .current-full-name {
@@ -355,6 +400,10 @@ h2 {
   min-width: 0;
   overflow: hidden;
   padding: 18px;
+}
+
+.workspace:has(.keyboard-panel) .controls {
+  height: 100%;
 }
 
 .controls > * {
@@ -718,6 +767,14 @@ textarea {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
+}
+
+.keyboard-header {
+  justify-content: flex-end;
+}
+
+.keyboard-header h2 {
+  display: none;
 }
 
 .toggle-row {
@@ -1360,7 +1417,7 @@ textarea {
 }
 
 .chord-notation-panel > div:first-child {
-  display: none;
+  display: block;
 }
 
 .chord-notation-panel h3 {
@@ -1376,6 +1433,17 @@ textarea {
   font-size: 1.36rem;
   font-weight: 900;
   line-height: 1;
+}
+
+.chord-notation-panel span strong,
+.chord-notation-panel span small {
+  display: block;
+}
+
+.chord-notation-panel span strong {
+  color: #951b81;
+  font-size: 1.36rem;
+  font-weight: 950;
 }
 
 .chord-notation-panel span small {
@@ -1409,6 +1477,11 @@ textarea {
   border: 1px solid rgba(106, 111, 118, 0.2);
   border-radius: 8px;
   background: #f7f7f5;
+}
+
+.page-view > .selected-song-chords {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .selected-song-chords[hidden] {
@@ -1576,6 +1649,47 @@ textarea {
   border-radius: inherit;
   transform: translateZ(0);
   z-index: 0;
+}
+
+.scale-video-poster {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  padding: 28px;
+  color: rgba(255,255,255,0.88);
+  background:
+    radial-gradient(circle at 50% 44%, rgba(213, 165, 29, 0.18), transparent 28%),
+    radial-gradient(circle at 20% 16%, rgba(213, 165, 29, 0.18), transparent 24%),
+    linear-gradient(135deg, #111214 0%, #1c1e22 60%, #0f1012 100%);
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.scale-video-poster img {
+  display: block;
+  width: min(44%, 250px);
+  height: auto;
+  opacity: 0.76;
+  filter: drop-shadow(0 18px 34px rgba(0,0,0,0.42));
+}
+
+.scale-video-poster span {
+  align-self: end;
+  max-width: 86%;
+  color: rgba(255,255,255,0.72);
+  font-size: clamp(0.82rem, 1.7vw, 1.04rem);
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.nootstudio-video-player.has-started .scale-video-poster,
+.nootstudio-video-player.is-playing .scale-video-poster {
+  opacity: 0;
+  transform: scale(1.02);
 }
 
 .scale-video-brand {
@@ -2235,7 +2349,7 @@ textarea {
 }
 
 .selected-song-measure-line.has-meter {
-  padding-left: 42px;
+  padding-left: 0;
 }
 
 .selected-song-meter {
@@ -2245,8 +2359,8 @@ textarea {
   justify-content: center;
   gap: 2px;
   position: absolute;
-  left: 0;
-  top: 50%;
+  left: 6px;
+  top: var(--selected-bar-center, 50%);
   transform: translateY(-50%);
   min-width: 36px;
   min-height: 44px;
@@ -2272,6 +2386,10 @@ textarea {
   min-width: 0;
   border-left: 0;
   padding: 28px 9px 0;
+}
+
+.selected-song-measure.has-inline-meter {
+  padding-left: 58px;
 }
 
 .selected-song-measure::before {
@@ -4010,6 +4128,54 @@ textarea {
 
 .custom-builder-card {
   padding: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.custom-step {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 16px;
+  border: 1px solid #ece6d2;
+  border-radius: 10px;
+  background: rgba(255, 250, 240, 0.62);
+}
+
+.custom-step-number {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  color: #171717;
+  background: var(--accent);
+  box-shadow: 0 8px 18px rgba(213, 165, 29, 0.22);
+  font-size: 1.25rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.custom-step-content {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.custom-step-content h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1.05;
+}
+
+.custom-step .custom-scale-picker,
+.custom-step .custom-scale-keyboard,
+.custom-step .custom-example-panel,
+.custom-step .custom-picker,
+.custom-step .custom-text-add {
+  margin: 0;
 }
 
 .custom-builder-head {
@@ -4034,7 +4200,7 @@ textarea {
 
 .custom-builder-head span {
   display: block;
-  margin-top: 4px;
+  margin-top: 0;
   color: var(--muted);
   font-weight: 800;
 }
@@ -4100,7 +4266,7 @@ textarea {
 
 .custom-scale-keyboard .song-scale-piano {
   margin: 0;
-  max-width: 820px;
+  max-width: none;
 }
 
 .custom-picker {
@@ -4161,6 +4327,39 @@ textarea {
   background: var(--accent);
   cursor: pointer;
   font-weight: 900;
+}
+
+.custom-chord-workspace {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.custom-chord-workspace-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.custom-chord-workspace-head h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.custom-print-step-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.custom-print-step-content h2 {
+  margin: 0;
 }
 
 .custom-example-panel {
@@ -4338,15 +4537,27 @@ textarea {
 
   .topbar {
     gap: 12px;
-    padding: 8px 58px 16px 0;
+    min-height: 0;
+    padding: 8px 76px 16px 0;
   }
 
   .brand-title {
     display: grid;
     row-gap: 1px;
-    max-width: calc(100vw - 96px);
+    max-width: calc(100vw - 118px);
     font-size: clamp(2.25rem, 11vw, 4.2rem);
     line-height: 0.88;
+  }
+
+  .brand-title-logo {
+    display: block;
+    max-width: calc(100vw - 94px);
+    line-height: 1;
+  }
+
+  .brand-logo {
+    width: min(206px, calc(100vw - 108px));
+    max-height: 118px;
   }
 
   .brand-title span:last-child {
@@ -4377,12 +4588,20 @@ textarea {
     top: max(12px, env(safe-area-inset-top));
     right: max(12px, env(safe-area-inset-right));
     z-index: 80;
-    display: inline-grid;
-    place-items: center;
-    gap: 2px;
-    width: 44px;
-    height: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 52px;
+    min-width: 52px;
+    max-width: 52px;
+    height: 52px;
+    min-height: 52px;
+    max-height: 52px;
+    flex: 0 0 52px;
     padding: 0;
+    box-sizing: border-box;
     border: 1px solid rgba(21,21,21,0.14);
     border-radius: 999px;
     background: rgba(255,255,255,0.92);
@@ -4390,16 +4609,30 @@ textarea {
     cursor: pointer;
   }
 
+  .app-shell.custom-mode .mobile-page-menu-button,
+  .mobile-page-menu-button {
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    flex: 0 0 52px !important;
+    transform: none !important;
+  }
+
   .mobile-page-menu-button span {
-    width: 18px;
-    height: 2.5px;
+    display: block;
+    flex: 0 0 auto;
+    width: 23px;
+    height: 3px;
     border-radius: 999px;
     background: var(--ink);
   }
 
   .mobile-page-menu {
     position: fixed;
-    top: calc(max(12px, env(safe-area-inset-top)) + 54px);
+    top: calc(max(12px, env(safe-area-inset-top)) + 62px);
     right: max(12px, env(safe-area-inset-right));
     z-index: 79;
     display: grid;
@@ -4433,6 +4666,11 @@ textarea {
     background: var(--accent);
   }
 
+  .mobile-page-menu-item:not([data-page]) {
+    color: var(--ink);
+    background: rgba(239,237,230,0.86);
+  }
+
   .page-tab[data-page="song"] {
     display: none;
   }
@@ -4442,7 +4680,15 @@ textarea {
   }
 
   .current-chord {
+    grid-template-columns: 1fr;
+    gap: 10px;
     min-width: 0;
+  }
+
+  .current-chord .chord-notation-staff {
+    justify-self: start;
+    width: min(100%, 180px);
+    min-height: 82px;
   }
 
   .controls {
@@ -4574,7 +4820,7 @@ textarea {
   }
 
   .scale-video-body {
-    padding: 12px;
+    padding: 10px 6px 18px;
     border-radius: 16px;
     overflow: hidden;
   }
@@ -4588,10 +4834,11 @@ textarea {
   }
 
   .nootstudio-video-player {
+    background: #151515;
     box-shadow:
-      0 24px 34px rgba(0,0,0,0.22),
-      0 12px 24px rgba(0,0,0,0.16),
-      0 0 30px rgba(213, 165, 29, 0.18),
+      0 18px 24px -8px rgba(0,0,0,0.34),
+      0 8px 18px -10px rgba(0,0,0,0.28),
+      0 0 24px rgba(213, 165, 29, 0.14),
       inset 0 0 0 1px rgba(255,255,255,0.06);
   }
 
@@ -4715,6 +4962,23 @@ textarea {
     bottom: 50px;
   }
 
+  .custom-scale-keyboard .white-key.scale-root::after,
+  .custom-scale-keyboard .black-key.scale-root::after {
+    width: 10px;
+    height: 10px;
+    z-index: 5;
+  }
+
+  .custom-scale-keyboard .white-key.scale-root::after {
+    top: auto;
+    bottom: 32px;
+  }
+
+  .custom-scale-keyboard .black-key.scale-root::after {
+    top: auto;
+    bottom: 22px;
+  }
+
   #keyboard .black-key.root::before,
   #keyboard .black-key.scale-root.root::before {
     top: 53%;
@@ -4805,8 +5069,26 @@ textarea {
     gap: 6px;
     margin-top: 0;
     padding: 8px 9px;
-    width: min(190px, calc(100vw - 150px));
+    width: min(210px, calc(100vw - 142px));
     box-sizing: border-box;
+  }
+
+  .chord-notation-panel > div:first-child {
+    display: block;
+    text-align: center;
+  }
+
+  .chord-notation-panel h3 {
+    display: none;
+  }
+
+  .chord-notation-panel span strong {
+    font-size: 1rem;
+  }
+
+  .chord-notation-panel span small {
+    font-size: 0.56rem;
+    line-height: 1.1;
   }
 
   .chord-notation-staff {
@@ -5068,17 +5350,45 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .custom-title-card,
+  .custom-builder-card {
+    padding: 18px;
+  }
+
   .custom-builder-actions {
     justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .custom-builder-head {
+    display: grid;
+    gap: 14px;
+  }
+
+  .custom-builder-head span {
+    font-size: 1.02rem;
+    line-height: 1.22;
   }
 
   .custom-zoom-control {
     width: max-content;
     max-width: 100%;
+    min-height: 54px;
+    padding: 8px 10px 8px 14px;
+  }
+
+  .custom-zoom-control span {
+    font-size: 0.92rem;
+  }
+
+  .custom-zoom-control button {
+    width: 36px;
+    height: 36px;
+    font-size: 1.25rem;
   }
 
   .custom-zoom-control input {
-    width: 78px;
+    width: 108px;
   }
 
   .custom-scale-picker,
@@ -5091,24 +5401,38 @@ textarea {
     gap: 10px;
   }
 
+  .custom-scale-picker {
+    overflow-x: visible;
+  }
+
   .custom-scale-picker label,
   .custom-picker label,
   .custom-text-add label {
     width: max-content;
     max-width: 100%;
+    gap: 8px;
+    font-size: 1rem;
   }
 
   #customRootSelect,
   #customKeySelect {
-    width: 82px;
+    width: 104px;
   }
 
   #customQualitySelect {
-    width: min(176px, calc(100vw - 56px));
+    width: min(240px, calc(100vw - 56px));
   }
 
   #customScaleSelect {
-    width: min(150px, calc(100vw - 56px));
+    width: min(190px, calc(100vw - 56px));
+  }
+
+  .custom-scale-picker select,
+  .custom-picker select,
+  .custom-text-add input {
+    min-height: 58px;
+    padding-inline: 16px;
+    font-size: 1.28rem;
   }
 
   .custom-picker button,
@@ -5117,34 +5441,365 @@ textarea {
     width: max-content;
     min-width: 0;
     flex: 0 0 auto;
+    min-height: 56px;
+    padding-inline: 22px;
+    font-size: 1.08rem;
     white-space: nowrap;
   }
 
   .custom-text-add input {
-    width: min(260px, calc(100vw - 56px));
+    width: min(310px, calc(100vw - 56px));
   }
 
-  .custom-builder-head {
-    display: grid;
+  .custom-scale-keyboard {
+    max-width: 100%;
+    overflow-x: auto;
+    scroll-padding-inline: 50%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .custom-scale-keyboard .song-scale-piano {
+    --mobile-white-key-width: 44px;
+    grid-template-columns: repeat(19, var(--mobile-white-key-width));
+    width: calc(19 * var(--mobile-white-key-width));
+    max-width: none;
+    min-width: calc(19 * var(--mobile-white-key-width));
+    height: 156px;
   }
 
   .custom-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    padding: 10px;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    min-height: 220px;
+    padding: 16px;
+    font-size: 1.05rem;
   }
 
   .custom-chord-card {
-    min-height: 138px;
-    padding: 12px 10px 10px;
+    gap: 14px;
+    min-height: 230px;
+    padding: 20px 18px 18px;
   }
 
   .custom-chord-card strong {
-    font-size: 1.22rem;
+    font-size: 2rem;
+  }
+
+  .custom-card-voicing {
+    font-size: 1rem;
+  }
+
+  .custom-start-voicing {
+    font-size: 0.92rem;
+  }
+
+  .custom-start-voicing select {
+    width: min(100%, 210px);
+    min-height: 44px;
+    font-size: 1rem;
   }
 
   .custom-chord-card .mini-keyboard {
-    height: 56px;
+    width: min(100%, 300px);
+    height: 110px;
+  }
+
+  .custom-remove {
+    width: 34px;
+    height: 34px;
+    font-size: 1.25rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode {
+    width: min(100vw - 18px, 1180px);
+  }
+
+  body:not(.custom-printing) .page-view[data-page-view="custom"].active {
+    font-size: 1.08rem;
+  }
+
+  body:not(.custom-printing) .custom-page {
+    gap: 18px;
+  }
+
+  body:not(.custom-printing) .custom-title-card,
+  body:not(.custom-printing) .custom-builder-card {
+    padding: 20px 18px;
+    border-radius: 10px;
+  }
+
+  body:not(.custom-printing) .custom-title-fields input,
+  body:not(.custom-printing) .custom-scale-picker select,
+  body:not(.custom-printing) .custom-picker select,
+  body:not(.custom-printing) .custom-text-add input {
+    min-height: 60px;
+    border-radius: 9px;
+    font-size: 1.28rem;
+  }
+
+  body:not(.custom-printing) .custom-scale-picker,
+  body:not(.custom-printing) .custom-picker,
+  body:not(.custom-printing) .custom-text-add {
+    gap: 12px;
+  }
+
+  body:not(.custom-printing) .custom-scale-picker label,
+  body:not(.custom-printing) .custom-picker label,
+  body:not(.custom-printing) .custom-text-add label {
+    font-size: 1rem;
+  }
+
+  body:not(.custom-printing) #customKeySelect,
+  body:not(.custom-printing) #customRootSelect {
+    width: 112px;
+  }
+
+  body:not(.custom-printing) #customScaleSelect {
+    width: min(196px, calc(100vw - 56px));
+  }
+
+  body:not(.custom-printing) #customQualitySelect {
+    width: min(250px, calc(100vw - 56px));
+  }
+
+  body:not(.custom-printing) .custom-picker button,
+  body:not(.custom-printing) .custom-text-add button,
+  body:not(.custom-printing) .custom-print-button {
+    min-height: 58px;
+    border-radius: 9px;
+    padding-inline: 22px;
+    font-size: 1.1rem;
+  }
+
+  body:not(.custom-printing) .custom-scale-keyboard .song-scale-piano {
+    --mobile-white-key-width: 48px;
+    grid-template-columns: repeat(19, var(--mobile-white-key-width));
+    width: calc(19 * var(--mobile-white-key-width));
+    min-width: calc(19 * var(--mobile-white-key-width));
+    height: 172px;
+  }
+
+  body:not(.custom-printing) .custom-grid {
+    min-height: 240px;
+    padding: 18px;
+  }
+
+  body:not(.custom-printing) .custom-chord-card {
+    min-height: 248px;
+    padding: 22px 18px 18px;
+  }
+
+  body:not(.custom-printing) .custom-chord-card strong {
+    font-size: 2.15rem;
+  }
+
+  body:not(.custom-printing) .custom-card-voicing {
+    font-size: 1.04rem;
+  }
+
+  body:not(.custom-printing) .custom-chord-card .mini-keyboard {
+    width: min(100%, 330px);
+    height: 118px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .topbar {
+    padding-right: 64px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .brand-title {
+    font-size: clamp(2.7rem, 12vw, 4.8rem);
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-page {
+    font-size: 1rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-title-card,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-builder-card {
+    padding: 18px 14px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-builder-card {
+    gap: 16px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-step {
+    position: relative;
+    display: block;
+    padding: 18px 14px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-step-number {
+    position: absolute;
+    top: 14px;
+    left: 12px;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    font-size: 1.2rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-step-content {
+    width: 100%;
+    min-width: 0;
+    gap: 16px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-step-content h2 {
+    min-height: 44px;
+    padding-left: 54px;
+    display: flex;
+    align-items: center;
+    font-size: clamp(1.65rem, 7vw, 2.25rem);
+    line-height: 1;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-title-fields label,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-scale-picker label,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-picker label,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-text-add label {
+    font-size: 0.96rem;
+    line-height: 1.18;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-title-fields input,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-scale-picker select,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-picker select,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-text-add input {
+    min-height: 56px;
+    padding-inline: 14px;
+    font-size: 1.16rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-builder-head span {
+    font-size: 1.18rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-zoom-control {
+    min-height: 62px;
+    padding: 10px 12px 10px 14px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-zoom-control span {
+    font-size: 1rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-zoom-control button {
+    width: 42px;
+    height: 42px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-chord-workspace-head {
+    align-items: flex-start;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-chord-workspace-head h3 {
+    font-size: 1.24rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-picker button,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-text-add button,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-print-button {
+    min-height: 54px;
+    padding-inline: 18px;
+    font-size: 1.02rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-scale-picker,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-picker,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-text-add {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-scale-keyboard {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    scroll-padding-inline: 50%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-scale-keyboard .song-scale-piano {
+    --mobile-white-key-width: 44px;
+    grid-template-columns: repeat(19, var(--mobile-white-key-width));
+    width: calc(var(--mobile-white-key-width) * 19);
+    min-width: calc(var(--mobile-white-key-width) * 19);
+    max-width: none;
+    height: 156px;
+    margin-inline: 0;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-example-panel h3 {
+    font-size: 1.26rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-example-card {
+    min-width: 88px;
+    padding: 13px 14px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-example-card strong {
+    font-size: 1.22rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-example-card span {
+    font-size: 0.82rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-grid {
+    gap: 16px;
+    min-height: 220px;
+    padding: 16px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-grid.empty {
+    font-size: 1.02rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card {
+    min-height: 250px;
+    padding: 20px 16px 18px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-card-head {
+    gap: 10px;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card strong {
+    font-size: 2rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-card-voicing,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-start-voicing {
+    font-size: 1rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-start-voicing select {
+    width: min(100%, 260px);
+    min-height: 52px;
+    font-size: 1rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card .mini-keyboard {
+    width: 100%;
+    max-width: 360px;
+    height: 124px;
+    justify-self: center;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-remove {
+    width: 40px;
+    height: 40px;
+    font-size: 1.45rem;
+  }
+
+  body:not(.custom-printing) .app-shell.custom-mode .custom-print-step-content {
+    display: flex;
+    align-items: center;
+    min-height: 54px;
+    padding-left: 54px;
+    justify-items: start;
   }
 }
 
@@ -5164,7 +5819,11 @@ textarea {
   }
 
   .selected-song-measure-line.has-meter {
-    padding-left: 36px;
+    padding-left: 0;
+  }
+
+  .selected-song-measure.has-inline-meter {
+    padding-left: 46px;
   }
 
   .selected-song-meter {
@@ -5657,6 +6316,12 @@ body.print-layout-probe .song-notation {
     box-shadow: none;
   }
 
+  body.custom-printing .custom-step,
+  body.custom-printing .custom-step-content,
+  body.custom-printing .custom-chord-workspace {
+    display: contents;
+  }
+
   body.custom-printing .custom-title-card {
     position: relative;
     min-height: 26mm;
@@ -5669,8 +6334,12 @@ body.print-layout-probe .song-notation {
   body.custom-printing .custom-picker,
   body.custom-printing .custom-text-add,
   body.custom-printing .custom-example-panel,
+  body.custom-printing .custom-step-number,
+  body.custom-printing .custom-step-content h2,
+  body.custom-printing .custom-chord-workspace-head,
   body.custom-printing .custom-start-voicing,
-  body.custom-printing .custom-remove {
+  body.custom-printing .custom-remove,
+  body.custom-printing .custom-print-button {
     display: none !important;
   }
 
@@ -5699,7 +6368,7 @@ body.print-layout-probe .song-notation {
     top: 0;
     right: 0;
     display: block;
-    width: 30mm;
+    width: 44mm;
     height: auto;
     object-fit: contain;
   }

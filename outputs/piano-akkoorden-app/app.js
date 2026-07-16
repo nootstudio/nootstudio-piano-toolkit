@@ -521,7 +521,6 @@ const resetChordSequence = document.querySelector("#resetChordSequence");
 const chordSequenceResults = document.querySelector("#chordSequenceResults");
 const chordNotationTitle = document.querySelector("#chordNotationTitle");
 const chordNotationStaff = document.querySelector("#chordNotationStaff");
-const chordNotationPanel = document.querySelector(".chord-notation-panel");
 const mobileChordDetail = document.querySelector(".mobile-chord-detail");
 const selectedSongChords = document.querySelector("#selectedSongChords");
 const selectedSongTitle = document.querySelector("#selectedSongTitle");
@@ -630,24 +629,10 @@ const authEmail = document.querySelector("#authEmail");
 const authSubmit = document.querySelector("#authSubmit");
 const authStatus = document.querySelector("#authStatus");
 const authLogout = document.querySelector("#authLogout");
-
-const chordNotationHome = {
-  parent: chordNotationPanel?.parentElement || null,
-  before: chordNotationPanel?.nextElementSibling || null
-};
+const mobileAuthLogout = document.querySelector("#mobileAuthLogout");
 
 function syncChordNotationPlacement() {
-  if (!chordNotationPanel || !mobileChordDetail || !chordNotationHome.parent) return;
-  const mobile = window.matchMedia?.("(max-width: 820px)").matches ?? window.innerWidth <= 820;
-  if (mobile) {
-    if (chordNotationPanel.parentElement !== mobileChordDetail) {
-      mobileChordDetail.append(chordNotationPanel);
-    }
-    return;
-  }
-  if (chordNotationPanel.parentElement !== chordNotationHome.parent) {
-    chordNotationHome.parent.insertBefore(chordNotationPanel, chordNotationHome.before);
-  }
+  return;
 }
 
 let audioContext;
@@ -893,9 +878,20 @@ function visualTimingFromEntry(entry, meter) {
 }
 
 function measureMeter(measure, fallbackMeter = songState.meter) {
-  return measure.find((entry) => typeof entry === "object" && entry !== null && entry.meter)?.meter
-    || fallbackMeter
-    || songState.meter;
+  if (Array.isArray(measure)) {
+    return measure.meter
+      || measure.find((entry) => typeof entry === "object" && entry !== null && entry.meter)?.meter
+      || fallbackMeter
+      || songState.meter;
+  }
+  if (measure && typeof measure === "object") return measure.meter || fallbackMeter || songState.meter;
+  return fallbackMeter || songState.meter;
+}
+
+function measureEntriesFromMeasure(measure) {
+  if (Array.isArray(measure)) return measure;
+  if (measure && typeof measure === "object" && Array.isArray(measure.chords)) return measure.chords;
+  return [];
 }
 
 function chordBeatCount(entry, measure) {
@@ -904,9 +900,10 @@ function chordBeatCount(entry, measure) {
   if (typeof entry === "object" && entry !== null && entry.beats != null) {
     return visualTimingFromEntry(entry, meter).beats;
   }
-  const specified = measure.reduce((total, item) => total + visualTimingFromEntry(item, meter).beats, 0);
-  const unspecified = measure.filter((item) => item.beats == null).length;
-  if (!unspecified) return display.visualBeats / Math.max(measure.length, 1);
+  const entries = measureEntriesFromMeasure(measure);
+  const specified = entries.reduce((total, item) => total + visualTimingFromEntry(item, meter).beats, 0);
+  const unspecified = entries.filter((item) => item.beats == null).length;
+  if (!unspecified) return display.visualBeats / Math.max(entries.length, 1);
   return Math.max(0, display.visualBeats - specified) / unspecified;
 }
 
@@ -1024,6 +1021,9 @@ function songVoicing(parsedChord, previousNotes) {
 function sequenceVoicingScore(notes, previousNotes) {
   const center = voicingCenter(notes);
   const staffPenalty = notationLedgerPenalty(notes);
+  const lowLedgerPenalty = notes.reduce((total, note) => (
+    note.absolute < -6 ? total + (-6 - note.absolute) * 13 : total
+  ), 0);
   const rangePenalty = notes.reduce((total, note) => {
     if (note.absolute < -10) return total + (-10 - note.absolute) * 4;
     if (note.absolute > 18) return total + (note.absolute - 18) * 5;
@@ -1031,7 +1031,7 @@ function sequenceVoicingScore(notes, previousNotes) {
   }, 0);
   const continuity = previousNotes ? smoothVoicingDistance(notes, previousNotes) : 0;
   const centerWeight = previousNotes ? 0.55 : 1.9;
-  return Math.abs(center - 3) * centerWeight + staffPenalty + rangePenalty + continuity;
+  return Math.abs(center - 3) * centerWeight + staffPenalty + lowLedgerPenalty + rangePenalty + continuity;
 }
 
 function sequenceVoicing(parsedChord, previousNotes) {
@@ -1064,7 +1064,7 @@ function selectedSequenceVoicing(parsedChord) {
   return selectedSequenceVoicingForInversion(parsedChord, inversion);
 }
 
-function selectedSequenceVoicingForInversion(parsedChord, preferredInversion) {
+function selectedSequenceVoicingForInversion(parsedChord, preferredInversion, previousNotes = null) {
   const inversion = Math.min(preferredInversion, parsedChord.quality.intervals.length - 1);
   const candidates = [];
   for (let rootAbsolute = -12 + parsedChord.root.pitch; rootAbsolute <= 24 + parsedChord.root.pitch; rootAbsolute += 12) {
@@ -1077,7 +1077,7 @@ function selectedSequenceVoicingForInversion(parsedChord, preferredInversion) {
       inversion,
       rootAbsolute,
       notes,
-      score: sequenceVoicingScore(notes, null)
+      score: sequenceVoicingScore(notes, previousNotes)
     });
   }
   candidates.sort((a, b) => a.score - b.score);
@@ -1219,6 +1219,21 @@ function bestRootAbsoluteForScale(root, quality, inversion, scale) {
     candidates.push({
       rootAbsolute,
       score: scaleFitScore(notes, scaleStart, scaleEnd, scalePitchSet) + keyboardPenalty
+    });
+  }
+  candidates.sort((a, b) => a.score - b.score || a.rootAbsolute - b.rootAbsolute);
+  return candidates[0]?.rootAbsolute ?? root.pitch;
+}
+
+function bestRootAbsoluteForNotation(root, quality, inversion) {
+  const candidates = [];
+  for (let octaveShift = -3; octaveShift <= 4; octaveShift += 1) {
+    const rootAbsolute = root.pitch + octaveShift * 12;
+    const notes = voicedNotes(root, quality, inversion, rootAbsolute);
+    const centerDistance = Math.abs(voicingCenter(notes) - 3);
+    candidates.push({
+      rootAbsolute,
+      score: notationLedgerPenalty(notes) * 7 + centerDistance
     });
   }
   candidates.sort((a, b) => a.score - b.score || a.rootAbsolute - b.rootAbsolute);
@@ -1445,8 +1460,9 @@ function addStaffBarline(container, stave, x, className = "staff-barline") {
 function chordNotationLedgerScore(notes) {
   return notes.reduce((score, note) => {
     const y = staffYForNote(note);
-    const outside = y < 30 ? 30 - y : Math.max(0, y - 72);
-    return score + outside * 9 + Math.abs(y - 52) * 0.18;
+    const outside = y < 30 ? 30 - y : Math.max(0, y - 76);
+    const tooHigh = y < 44 ? 44 - y : 0;
+    return score + outside * 8 + tooHigh * 1.5 + Math.abs(y - 68) * 0.22;
   }, 0);
 }
 
@@ -1858,7 +1874,7 @@ function playPianoTone(context, frequency, startTime, duration, velocity) {
 
 function playCurrentChord() {
   if (state.chordMode !== "search" && !state.chordActive) return;
-  stopStandaloneAudioPlayback();
+  if (!isSongPlaying) resetAudioContext();
   const context = getAudioContext();
   const now = context.currentTime + 0.03;
   const scale = scaleNotes(state.key, state.scale);
@@ -2130,9 +2146,7 @@ function transposedSongSections(song) {
         const measureMeta = !Array.isArray(measure) && measure && typeof measure === "object" ? measure : null;
         const measureKey = measureMeta?.key || sectionKey;
         const transposedMeasureKey = transposeKeyLabel(measureKey, interval, selectedSongTransposeKeyLabel(song));
-        const chords = Array.isArray(measure)
-          ? measure
-          : (Array.isArray(measure?.chords) ? measure.chords : []);
+        const chords = measureEntriesFromMeasure(measure);
         const transposedChords = chords.map((entry) => transposeChordEntry(entry, interval, transposedMeasureKey));
         return measureMeta ? { ...measureMeta, key: transposedMeasureKey, chords: transposedChords } : transposedChords;
       })
@@ -2216,11 +2230,12 @@ function setAuthView(mode) {
   document.body.classList.add(mode);
   if (authGate) authGate.hidden = mode === "auth-unlocked";
   if (authLogout) authLogout.hidden = mode !== "auth-unlocked";
+  if (mobileAuthLogout) mobileAuthLogout.hidden = mode !== "auth-unlocked";
 }
 
 function isLocalDevBypass() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get("dev") !== "1") return false;
+  if (params.get("dev") === "0") return false;
   const host = window.location.hostname;
   return host === "localhost"
     || host === "127.0.0.1"
@@ -3068,9 +3083,7 @@ function songSearchMeasures(song) {
     song.sections.forEach((section, sectionIndex) => {
       const sectionTitle = section.title || "";
       (section.measures || []).forEach((measure, measureIndex) => {
-        const chords = Array.isArray(measure)
-          ? measure
-          : (Array.isArray(measure?.chords) ? measure.chords : []);
+        const chords = measureEntriesFromMeasure(measure);
         const entries = measureEntries(chords, { sectionTitle, sectionIndex, measureIndex });
         if (entries.length) measures.push(entries);
       });
@@ -3118,7 +3131,7 @@ function contiguousChordMatch(entries, pattern, key, options = {}) {
 function sectionChordStreams(measures) {
   const streams = new Map();
   measures.forEach((measure) => {
-    measure.forEach((entry) => {
+    measureEntriesFromMeasure(measure).forEach((entry) => {
       const streamKey = `${entry.sectionIndex ?? 0}:${entry.sectionTitle || ""}`;
       const stream = streams.get(streamKey) || [];
       stream.push(entry);
@@ -3422,10 +3435,8 @@ function songGridMeterMark(meter) {
 }
 
 function inspirationMeasureInfo(measure, fallbackMeter) {
-  const chords = Array.isArray(measure)
-    ? measure
-    : (Array.isArray(measure?.chords) ? measure.chords : []);
-  const meter = measure?.meter || fallbackMeter;
+  const chords = measureEntriesFromMeasure(measure);
+  const meter = measureMeter(measure, fallbackMeter);
   const display = meterDisplayDetails(meter);
   const specified = chords.reduce((total, item) => total + visualTimingFromEntry(item, meter).beats, 0);
   const unspecified = chords.filter((item) => item?.beats == null).length;
@@ -3458,6 +3469,7 @@ function inspirationMeasureInfo(measure, fallbackMeter) {
   return {
     key: measure?.key || "",
     meter,
+    explicitMeter: Boolean(measure?.meter),
     ending: measure?.ending || "",
     nav: Array.isArray(measure?.nav) ? measure.nav : [],
     repeatStart: Boolean(measure?.repeatStart),
@@ -3519,7 +3531,14 @@ function renderSelectedInspirationSong() {
             runningMeter = info.meter || runningMeter;
             return info;
           })
-          .filter((measure) => measure.chords.length)
+          .filter((measure) => (
+            measure.chords.length
+            || measure.meter
+            || measure.repeatStart
+            || measure.repeatEnd
+            || measure.ending
+            || measure.nav.length
+          ))
       };
     }).filter((section) => section.measures.length)
     : null;
@@ -3579,6 +3598,7 @@ function renderSelectedInspirationSong() {
   if (sections) {
     let activeKeyLabel = sections[0]?.key || state.key.label;
     let activeMeter = "";
+    let songMeterShown = false;
     sections.forEach((section) => {
       if (section.key && section.key !== activeKeyLabel) {
         selectedSongChordList.append(renderModulationMarker(section.key));
@@ -3593,18 +3613,12 @@ function renderSelectedInspirationSong() {
       row.className = "selected-song-part-row";
       let currentLine = null;
       let measuresInLine = 0;
-      let pendingMeter = null;
       const ensureMeasureLine = () => {
         if (!currentLine || measuresInLine >= 4) {
           currentLine = document.createElement("div");
           currentLine.className = "selected-song-measure-line";
           row.append(currentLine);
           measuresInLine = 0;
-        }
-        if (pendingMeter) {
-          currentLine.classList.add("has-meter");
-          currentLine.append(pendingMeter);
-          pendingMeter = null;
         }
       };
       section.measures.forEach((measure, measureIndex) => {
@@ -3616,13 +3630,23 @@ function renderSelectedInspirationSong() {
           row.append(renderModulationMarker(measureKeyLabel));
           activeKeyLabel = measureKeyLabel;
         }
-        if (measure.meter && measure.meter !== activeMeter) {
-          pendingMeter = selectedSongMeterMark(measure.meter);
+        const measureMeterValue = measureMeter(measure, section.meter || song.meter || activeMeter || "");
+        const visibleMeter = !songMeterShown || (measureMeterValue && measureMeterValue !== activeMeter)
+          ? measureMeterValue
+          : "";
+        if (visibleMeter) {
+          activeMeter = visibleMeter;
+          songMeterShown = true;
+        } else if (measure.meter) {
           activeMeter = measure.meter;
         }
         const measureEl = document.createElement("div");
         measureEl.className = "selected-song-measure";
-        const meterDisplay = meterDisplayDetails(measure.meter);
+        if (visibleMeter) {
+          measureEl.classList.add("has-inline-meter");
+          measureEl.append(selectedSongMeterMark(visibleMeter));
+        }
+        const meterDisplay = meterDisplayDetails(measureMeter(measure));
         const measureBeats = Math.max(1, meterDisplay.visualBeats);
         const measureSlots = Math.max(1, Math.round(meterDisplay.visualSlots));
         measureEl.classList.add("timed");
@@ -3651,7 +3675,7 @@ function renderSelectedInspirationSong() {
           nav.innerHTML = navigationMarkerHtml(measure.nav);
           measureEl.append(nav);
         }
-        measure.chords.forEach((token) => renderChordButton(token, measureEl, measureKeyLabel));
+        measureEntriesFromMeasure(measure).forEach((token) => renderChordButton(token, measureEl, measureKeyLabel));
         if (measure.repeatEnd && measure.repeatCount > 1) {
           measureEl.classList.add("has-repeat-badge");
           const repeatBadge = document.createElement("span");
@@ -3680,11 +3704,12 @@ function setActivePage(page) {
   appShell.classList.toggle("custom-mode", page === "custom");
   mobilePageMenuButton?.setAttribute("aria-expanded", "false");
   if (mobilePageMenu) mobilePageMenu.hidden = true;
-  appTitle.classList.toggle("brand-title", page === "chords");
-  if (page === "chords") {
-    appTitle.innerHTML = "<span>Nootstudio</span><span>piano toolkit</span>";
-  } else {
-    appTitle.textContent = page === "song" ? "Liedje begeleiden" : "Zelf samenstellen";
+  appTitle.classList.add("brand-title", "brand-title-logo");
+  if (!appTitle.querySelector(".brand-logo")) {
+    appTitle.innerHTML = '<img class="brand-logo" src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="Nootstudio piano toolkit">';
+  }
+  if (window.matchMedia?.("(max-width: 820px)").matches) {
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 }
 
@@ -3878,6 +3903,7 @@ function setKeyFromCircleItem(item) {
   syncChordToKey();
   syncSongTheoryToChordTab();
   render();
+  scrollToKeyboardAfterKeyChange();
 }
 
 function renderRootTabs() {
@@ -4030,9 +4056,34 @@ function scrollToMobileChordDetail() {
   });
 }
 
+function scrollToChordInfoBlock() {
+  const target = mobileChordDetail || currentName || keyboardPanel;
+  if (!target) return;
+  requestAnimationFrame(() => {
+    const top = target.getBoundingClientRect().top + window.scrollY - 10;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  });
+}
+
 function scrollToKeyboardPanel() {
   if (!shouldAutoFocusKeyboard() || !keyboardPanel) return;
   requestAnimationFrame(() => {
+    const top = keyboardPanel.getBoundingClientRect().top + window.scrollY - 8;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  });
+}
+
+function scrollToKeyboardAfterKeyChange() {
+  scrollToKeyboardPanel();
+}
+
+function keepKeyboardPanelInViewOnTablet() {
+  if (!keyboardPanel || !window.matchMedia("(min-width: 700px) and (max-width: 1180px)").matches) return;
+  if (!document.querySelector('[data-page-view="chords"].active')) return;
+  requestAnimationFrame(() => {
+    const rect = keyboardPanel.getBoundingClientRect();
+    const shouldMove = rect.top < 10 || rect.top > window.innerHeight * 0.34;
+    if (!shouldMove) return;
     const top = keyboardPanel.getBoundingClientRect().top + window.scrollY - 8;
     window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   });
@@ -4057,6 +4108,38 @@ function focusActiveChordOnKeyboard() {
     keyboardScroll.scrollTo({
       left: Math.max(0, Math.min(target, maxScroll)),
       behavior: "smooth"
+    });
+  });
+}
+
+function centerCurrentScaleOnKeyboard({ behavior = "auto" } = {}) {
+  if (!keyboardScroll || !shouldAutoFocusKeyboard()) return;
+  const scale = scaleNotes(state.key, state.scale);
+  const finalRoot = scale[0] ? { ...scale[0], absolute: scale[0].absolute + 12 } : null;
+  const notes = finalRoot ? [...scale, finalRoot] : scale;
+  const targetAbsolutes = new Set(notes.map((note) => 3 * 12 + note.absolute));
+
+  requestAnimationFrame(() => {
+    const scaleKeys = [...keyboard.querySelectorAll("button")].filter((key) => {
+      const absolute = Number(key.dataset.octave) * 12 + Number(key.dataset.pitch);
+      return targetAbsolutes.has(absolute);
+    });
+    if (!scaleKeys.length || keyboardScroll.scrollWidth <= keyboardScroll.clientWidth) return;
+
+    const scrollRect = keyboardScroll.getBoundingClientRect();
+    const keyRects = scaleKeys.map((key) => key.getBoundingClientRect());
+    const left = Math.min(...keyRects.map((rect) => rect.left)) - scrollRect.left + keyboardScroll.scrollLeft;
+    const right = Math.max(...keyRects.map((rect) => rect.right)) - scrollRect.left + keyboardScroll.scrollLeft;
+    const width = right - left;
+    const padding = 14;
+    const maxScroll = keyboardScroll.scrollWidth - keyboardScroll.clientWidth;
+    const target = width + padding * 2 <= keyboardScroll.clientWidth
+      ? left + width / 2 - keyboardScroll.clientWidth / 2
+      : left - padding;
+
+    keyboardScroll.scrollTo({
+      left: Math.max(0, Math.min(target, maxScroll)),
+      behavior
     });
   });
 }
@@ -4130,8 +4213,12 @@ function nootstudioScaleVideoHtml(source, title) {
   return `
     <div class="scale-video-frame nootstudio-video-player">
       <video src="${escapeHtml(source)}" preload="metadata" playsinline></video>
+      <div class="scale-video-poster" aria-hidden="true">
+        <img src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="">
+        <span>${formatMusicText(title)}</span>
+      </div>
       <div class="scale-video-brand" aria-hidden="true">
-        <img src="assets/nootstudio-logo-zwart.png" alt="">
+        <img src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="">
       </div>
       <button class="scale-video-big-play" type="button" aria-label="Speel ${escapeHtml(title)}">
         <span aria-hidden="true"></span>
@@ -4196,15 +4283,24 @@ function setupNootstudioScaleVideoPlayer(player) {
     currentLabel.textContent = formatMediaTime(video.currentTime);
     durationLabel.textContent = formatMediaTime(duration);
   };
+  const startPlayback = () => {
+    player.classList.add("has-started");
+    const playPromise = video.play();
+    if (playPromise?.catch) playPromise.catch(() => showControls());
+  };
+  const playVideo = () => {
+    showControls();
+    startPlayback();
+  };
   const togglePlayback = () => {
     showControls();
     if (video.paused) {
-      video.play();
+      startPlayback();
     } else {
       video.pause();
     }
   };
-  bigPlay.addEventListener("click", togglePlayback);
+  bigPlay.addEventListener("click", playVideo);
   playButton.addEventListener("click", togglePlayback);
   video.addEventListener("click", () => {
     if (isTouchVideoMode() && !touchControlsWereVisible) {
@@ -4354,7 +4450,7 @@ function updateSummary(notes, scale) {
 function updateScaleOnlySummary(scale) {
   currentName.classList.remove("search-found");
   searchResultLabel?.classList.remove("search-found");
-  currentName.innerHTML = `<span class="current-full-name">${formatMusicText(state.key.label)} ${state.scale.name} toonladder</span>`;
+  currentName.innerHTML = `<span class="current-symbol scale-summary-symbol">${formatMusicText(state.key.label)} ${state.scale.name} toonladder</span>`;
   currentNotes.innerHTML = formatNoteList(scale);
   pianoTitle.innerHTML = `${formatMusicText(state.key.label)} ${state.scale.name}`;
   noteStrip.innerHTML = "";
@@ -4398,15 +4494,30 @@ function chordSequenceItemId(chord) {
   return [chord.root, chord.qualityId, chord.rootAbsolute].join(":");
 }
 
+function sequenceInversionOptions(chord) {
+  const quality = qualities.find((item) => item.id === chord.qualityId) || state.quality;
+  const maxInversion = Math.max(0, quality.intervals.length - 1);
+  return Array.from({ length: maxInversion + 1 }, (_item, index) => ({
+    value: index,
+    label: voicingLabel(index)
+  }));
+}
+
 function sequenceChordWithVoicing(chord, previousNotes = null, useSelectedInversion = false) {
   const matchingRoot = rootOptions.find((root) => root.label === chord.root)
     || rootOptions.find((root) => root.pitch === chord.rootPitch)
     || state.root;
   const matchingQuality = qualities.find((quality) => quality.id === chord.qualityId) || state.quality;
   const parsedChord = { root: matchingRoot, quality: matchingQuality };
-  const voicing = useSelectedInversion
-    ? selectedSequenceVoicing(parsedChord)
-    : sequenceVoicing(parsedChord, previousNotes);
+  const maxInversion = Math.max(0, matchingQuality.intervals.length - 1);
+  const manualInversion = Number.isFinite(chord.manualInversion)
+    ? Math.min(Math.max(0, Number(chord.manualInversion)), maxInversion)
+    : null;
+  const voicing = manualInversion !== null
+    ? selectedSequenceVoicingForInversion(parsedChord, manualInversion, previousNotes)
+    : (useSelectedInversion
+      ? selectedSequenceVoicing(parsedChord)
+      : sequenceVoicing(parsedChord, previousNotes));
   return {
     ...chord,
     root: matchingRoot.label,
@@ -4417,6 +4528,7 @@ function sequenceChordWithVoicing(chord, previousNotes = null, useSelectedInvers
     notes: voicing.notes,
     voicingNotes: voicing.notes,
     inversion: voicing.inversion,
+    manualInversion,
     selectedRootAbsolute: voicing.rootAbsolute
   };
 }
@@ -4506,8 +4618,21 @@ function renderChordSequence() {
       <small>${index + 1}</small>
       <strong>${formatMusicText(chord.symbol)}</strong>
       <span>${formatNoteList(chord.voicingNotes || chord.notes || [])}</span>
+      <em>${formatMusicText(voicingLabel(chord.inversion))}</em>
     `;
-    button.addEventListener("click", () => applyDegreeChord(chord, { record: false }));
+    button.addEventListener("click", () => {
+      const options = sequenceInversionOptions(chord);
+      const currentIndex = options.findIndex((option) => Number(option.value) === chord.inversion);
+      const nextOption = options[(currentIndex + 1 + options.length) % options.length] || options[0];
+      const nextSequence = state.chordSequence.map((item, itemIndex) => (
+        itemIndex === index
+          ? { ...item, manualInversion: Number(nextOption.value) }
+          : item
+      ));
+      state.chordSequence = rebuildChordSequence(nextSequence);
+      applyDegreeChord({ ...chord, inversion: Number(nextOption.value) }, { record: false, focus: false });
+      render();
+    });
     chordSequenceList.append(button);
   });
   renderChordSequenceNotation();
@@ -4519,9 +4644,16 @@ function customChordWithVoicing(chord, previousNotes = null, index = 0) {
     || customState.root;
   const quality = qualities.find((option) => option.id === chord.qualityId) || customState.quality;
   const parsedChord = { root, quality };
-  const voicing = index === 0
-    ? selectedSequenceVoicingForInversion(parsedChord, chord.startInversion ?? customState.inversion)
-    : sequenceVoicing(parsedChord, previousNotes);
+  const maxInversion = Math.max(0, quality.intervals.length - 1);
+  const manualInversion = Number.isFinite(chord.manualInversion)
+    ? Math.min(Math.max(0, Number(chord.manualInversion)), maxInversion)
+    : null;
+  const firstInversion = Math.min(Math.max(0, Number(chord.startInversion ?? customState.inversion) || 0), maxInversion);
+  const voicing = manualInversion !== null
+    ? selectedSequenceVoicingForInversion(parsedChord, manualInversion, previousNotes)
+    : (index === 0
+      ? selectedSequenceVoicingForInversion(parsedChord, firstInversion)
+      : sequenceVoicing(parsedChord, previousNotes));
   return {
     ...chord,
     root: root.label,
@@ -4532,6 +4664,7 @@ function customChordWithVoicing(chord, previousNotes = null, index = 0) {
     notes: chordNotes(root, quality),
     voicingNotes: voicing.notes,
     inversion: voicing.inversion,
+    manualInversion,
     selectedRootAbsolute: voicing.rootAbsolute
   };
 }
@@ -4592,12 +4725,31 @@ function resetCustomChords() {
   renderCustomComposer();
 }
 
-function customInversionOptionsHtml(quality, selectedInversion) {
-  const labels = ["Grondligging", "1e omkering", "2e omkering", "3e omkering"];
-  const allowed = quality.intervals.length - 1;
-  return labels.map((label, index) => `
-    <option value="${index}" ${index === selectedInversion ? "selected" : ""} ${index > allowed ? "disabled" : ""}>${label}</option>
-  `).join("");
+function cycleCustomChordInversion(index) {
+  const chord = customState.chords[index];
+  if (!chord) return;
+  const quality = qualities.find((option) => option.id === chord.qualityId) || customState.quality;
+  const allowed = Math.max(0, quality.intervals.length - 1);
+  const currentInversion = Number.isFinite(chord.manualInversion)
+    ? Number(chord.manualInversion)
+    : Number(chord.inversion || 0);
+  const nextInversion = (Math.min(Math.max(0, currentInversion), allowed) + 1) % (allowed + 1);
+  customState.selectedIndex = index;
+  customState.chords = customState.chords.map((item, itemIndex) => {
+    if (itemIndex < index) return item;
+    if (itemIndex === index) {
+      const next = { ...item, manualInversion: nextInversion };
+      if (itemIndex === 0) {
+        next.startInversion = nextInversion;
+        customState.inversion = nextInversion;
+      }
+      return next;
+    }
+    const { manualInversion, ...automaticItem } = item;
+    return automaticItem;
+  });
+  rebuildCustomChords();
+  renderCustomComposer();
 }
 
 function setCustomZoom(value) {
@@ -4657,14 +4809,6 @@ function renderCustomComposer() {
       <div class="custom-card-head">
         <strong>${formatMusicText(chord.symbol)}</strong>
         <span class="custom-card-voicing">${formatMusicText(voicingLabel(chord.inversion))}</span>
-        ${index === 0 ? `
-          <label class="custom-start-voicing">
-            Startligging
-            <select aria-label="Startligging">
-              ${customInversionOptionsHtml(qualities.find((quality) => quality.id === chord.qualityId) || customState.quality, customState.inversion)}
-            </select>
-          </label>
-        ` : ""}
       </div>
       ${miniKeyboardHtml(chord.voicingNotes || chord.notes || [], true, {
         className: "custom-mini-keyboard",
@@ -4677,28 +4821,16 @@ function renderCustomComposer() {
       })}
     `;
     card.addEventListener("click", () => {
-      customState.selectedIndex = customState.selectedIndex === index ? null : index;
-      renderCustomComposer();
+      cycleCustomChordInversion(index);
     });
     card.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
-      customState.selectedIndex = customState.selectedIndex === index ? null : index;
-      renderCustomComposer();
+      cycleCustomChordInversion(index);
     });
     card.querySelector(".custom-remove").addEventListener("click", (event) => {
       event.stopPropagation();
       removeCustomChord(index);
-    });
-    card.querySelector(".custom-start-voicing select")?.addEventListener("click", (event) => {
-      event.stopPropagation();
-    });
-    card.querySelector(".custom-start-voicing select")?.addEventListener("change", (event) => {
-      event.stopPropagation();
-      customState.inversion = Number(event.currentTarget.value);
-      if (customState.chords[0]) customState.chords[0].startInversion = customState.inversion;
-      rebuildCustomChords();
-      renderCustomComposer();
     });
     customGrid.append(card);
   });
@@ -4708,6 +4840,13 @@ function renderCustomScaleKeyboard() {
   if (!customScaleKeyboard) return;
   const notes = scaleNotes(customState.key, customState.scale);
   customScaleKeyboard.innerHTML = scaleKeyboardHtml(notes, customState.key, customState.scale);
+  requestAnimationFrame(() => {
+    const markedKeys = Array.from(customScaleKeyboard.querySelectorAll(".in-scale"));
+    if (!markedKeys.length || customScaleKeyboard.scrollWidth <= customScaleKeyboard.clientWidth) return;
+    const left = Math.min(...markedKeys.map((key) => key.offsetLeft));
+    const right = Math.max(...markedKeys.map((key) => key.offsetLeft + key.offsetWidth));
+    customScaleKeyboard.scrollLeft = Math.max(0, (left + right) / 2 - customScaleKeyboard.clientWidth / 2);
+  });
 }
 
 function renderCustomPrintScale() {
@@ -4744,8 +4883,13 @@ function renderCustomExamples() {
 }
 
 function updateChordNotationPanel(notes, title = "") {
-  if (!chordNotationStaff || !chordNotationTitle) return;
-  chordNotationTitle.innerHTML = title || formatMusicText(chordSymbol(state.root, state.quality));
+  if (!chordNotationStaff) return;
+  const fallbackTitle = `
+    <strong>${formatMusicText(chordSymbol(state.root, state.quality))}</strong>
+    <small>${formatNoteList(notes)}</small>
+    <small>${formatMusicText(voicingLabel(state.inversion))}</small>
+  `;
+  if (chordNotationTitle) chordNotationTitle.innerHTML = title || fallbackTitle;
   chordNotationStaff.innerHTML = "";
   if (!notes.length) {
     chordNotationStaff.textContent = "";
@@ -4791,6 +4935,7 @@ function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus
       scrollToMobileChordDetail();
     }
   }
+  if (focus) keepKeyboardPanelInViewOnTablet();
 }
 
 function selectDegreeChord(chord) {
@@ -4956,14 +5101,14 @@ function renderGrid() {
       rootSelect.value = String(rootOptions.indexOf(state.root));
       qualitySelect.value = quality.id;
       render();
-      scrollToMobileChordDetail();
+      scrollToChordInfoBlock();
     });
     chordGrid.append(card);
   });
 }
 
 function playNotes(notes) {
-  stopStandaloneAudioPlayback();
+  if (!isSongPlaying) resetAudioContext();
   const context = getAudioContext();
   const now = context.currentTime + 0.03;
   notes.forEach((note, index) => {
@@ -6136,6 +6281,7 @@ function parseMusicXml(text) {
     const navMarkers = musicXmlNavigationMarkers(measureStack);
     const hasRepeatStart = musicXmlRepeatStart(measureStack);
     const repeatCount = musicXmlRepeatEndCount(measureStack);
+    if (changedMeter) measureEntries.meter = currentMeter;
     if (currentKeyLabel) measureEntries.key = currentKeyLabel;
     if (endingNumber) measureEntries.ending = endingNumber;
     if (navMarkers.length) measureEntries.nav = navMarkers;
@@ -6296,7 +6442,7 @@ function buildSongPlayback() {
 
   orderedSongEntries().forEach(({ section }) => {
     expandedMeasures(section.importedParts || parseMeasures(section.chords)).forEach((measure) => {
-      measure.forEach((entry, chordIndex) => {
+      measureEntriesFromMeasure(measure).forEach((entry, chordIndex) => {
         const token = chordEntryToken(entry);
         const chordDuration = beatDuration * chordBeatCount(entry, measure);
         const parsed = parseChordToken(token);
@@ -6407,7 +6553,8 @@ function renderSongCards(section, grid, startMeasure = 1, showMeter = false) {
         measureElement.classList.add("has-ending");
         measureElement.dataset.ending = measure.ending;
       }
-      measureElement.style.setProperty("--chords-in-measure", String(Math.max(measure.length, 1)));
+      const entries = measureEntriesFromMeasure(measure);
+      measureElement.style.setProperty("--chords-in-measure", String(Math.max(entries.length, 1)));
       const number = document.createElement("span");
       number.className = "measure-number";
       number.textContent = String(measureNumber);
@@ -6426,7 +6573,7 @@ function renderSongCards(section, grid, startMeasure = 1, showMeter = false) {
         measureElement.append(nav);
       }
 
-      measure.forEach((entry, chordIndex) => {
+      entries.forEach((entry, chordIndex) => {
         const result = chordCardHtml(entry, previousNotes, scaleSet, `${section.id}-${measureNumber - 1}-${chordIndex}-${playIndex}`, measure, chordIndex);
         previousNotes = result.notes;
         playIndex += 1;
@@ -6601,10 +6748,13 @@ function render() {
   if (state.chordMode === "search" && !searchResult) {
     updateChordNotationPanel([], "Zoek akkoord");
   } else {
-    const notationRootAbsolute = state.selectedRootAbsolute
-      ?? bestRootAbsoluteForScale(state.root, state.quality, state.inversion, scale);
+    const notationRootAbsolute = bestRootAbsoluteForNotation(state.root, state.quality, state.inversion);
     const notationNotes = voicedNotes(state.root, state.quality, state.inversion, notationRootAbsolute);
-    const notationTitle = `${formatMusicText(chordSymbol(state.root, state.quality))} <small>${voicingLabel(state.inversion)}</small>`;
+    const notationTitle = `
+      <strong>${formatMusicText(chordSymbol(state.root, state.quality))}</strong>
+      <small>${formatNoteList(notationNotes)}</small>
+      <small>${formatMusicText(voicingLabel(state.inversion))}</small>
+    `;
     updateChordNotationPanel(notationNotes, notationTitle);
   }
   renderSelectedInspirationSong();
@@ -6615,6 +6765,9 @@ function render() {
   renderGrid();
   renderSong();
   renderCustomComposer();
+  if (!state.chordActive && state.chordMode !== "search") {
+    centerCurrentScaleOnKeyboard();
+  }
   focusActiveChordOnKeyboard();
 }
 
@@ -6626,6 +6779,7 @@ rootSelect.addEventListener("change", () => {
   requestKeyboardFocus();
   render();
   scrollToMobileChordDetail();
+  keepKeyboardPanelInViewOnTablet();
 });
 
 keySelect.addEventListener("change", () => {
@@ -6635,6 +6789,7 @@ keySelect.addEventListener("change", () => {
   syncChordToKey();
   syncSongTheoryToChordTab();
   render();
+  scrollToKeyboardAfterKeyChange();
 });
 
 scaleSelect.addEventListener("change", () => {
@@ -6653,6 +6808,7 @@ qualitySelect.addEventListener("change", () => {
   requestKeyboardFocus();
   render();
   scrollToMobileChordDetail();
+  keepKeyboardPanelInViewOnTablet();
 });
 
 inversionSelect.addEventListener("change", () => {
@@ -6662,6 +6818,7 @@ inversionSelect.addEventListener("change", () => {
   requestKeyboardFocus();
   render();
   scrollToMobileChordDetail();
+  keepKeyboardPanelInViewOnTablet();
 });
 
 filterInput.addEventListener("input", renderGrid);
@@ -6845,12 +7002,15 @@ authForm?.addEventListener("submit", async (event) => {
   }
 });
 
-authLogout?.addEventListener("click", async () => {
+async function signOutUser() {
   await authClient?.auth.signOut();
   authAccessToken = "";
   setAuthView("auth-locked");
   setAuthStatus("Je bent uitgelogd. Log opnieuw in om de app te openen.");
-});
+}
+
+authLogout?.addEventListener("click", signOutUser);
+mobileAuthLogout?.addEventListener("click", signOutUser);
 
 authClient?.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
@@ -6883,6 +7043,7 @@ mobilePageMenuButton?.addEventListener("click", () => {
 
 mobilePageMenuItems.forEach((item) => {
   item.addEventListener("click", () => {
+    if (!item.dataset.page) return;
     setActivePage(item.dataset.page);
   });
 });
