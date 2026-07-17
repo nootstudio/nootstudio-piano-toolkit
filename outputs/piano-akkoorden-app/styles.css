@@ -2407,6 +2407,14 @@ textarea {
   padding-left: 24px;
 }
 
+.selected-song-measure.has-inline-meter.repeat-start {
+  padding-left: 92px;
+}
+
+.selected-song-measure.has-inline-meter.repeat-start .selected-song-meter {
+  left: 26px;
+}
+
 .selected-song-measure.repeat-end {
   border-right: 0;
   padding-right: 24px;
@@ -4313,7 +4321,8 @@ textarea {
 }
 
 .custom-picker button,
-.custom-print-button {
+.custom-print-button,
+.custom-pdf-button {
   min-height: 48px;
   border: 0;
   border-radius: 8px;
@@ -5301,6 +5310,14 @@ textarea {
     --selected-bar-center: 42px;
   }
 
+  .selected-song-measure.has-inline-meter.repeat-start {
+    padding-left: 78px;
+  }
+
+  .selected-song-measure.has-inline-meter.repeat-start .selected-song-meter {
+    left: 23px;
+  }
+
   .selected-song-measure.timed {
     display: flex;
     align-items: center;
@@ -5456,7 +5473,8 @@ textarea {
 
   .custom-picker button,
   .custom-text-add button,
-  .custom-print-button {
+  .custom-print-button,
+  .custom-pdf-button {
     width: max-content;
     min-width: 0;
     flex: 0 0 auto;
@@ -5583,7 +5601,8 @@ textarea {
 
   body:not(.custom-printing) .custom-picker button,
   body:not(.custom-printing) .custom-text-add button,
-  body:not(.custom-printing) .custom-print-button {
+  body:not(.custom-printing) .custom-print-button,
+  body:not(.custom-printing) .custom-pdf-button {
     min-height: 58px;
     border-radius: 9px;
     padding-inline: 22px;
@@ -5599,26 +5618,26 @@ textarea {
   }
 
   body:not(.custom-printing) .custom-grid {
-    min-height: 240px;
-    padding: 18px;
+    min-height: calc(240px * var(--custom-zoom, 1));
+    padding: calc(18px * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .custom-chord-card {
-    min-height: 248px;
-    padding: 22px 18px 18px;
+    min-height: calc(248px * var(--custom-zoom, 1));
+    padding: calc(22px * var(--custom-zoom, 1)) calc(18px * var(--custom-zoom, 1)) calc(18px * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .custom-chord-card strong {
-    font-size: 2.15rem;
+    font-size: calc(2.15rem * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .custom-card-voicing {
-    font-size: 1.04rem;
+    font-size: calc(1.04rem * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .custom-chord-card .mini-keyboard {
-    width: min(100%, 330px);
-    height: 118px;
+    width: min(100%, calc(330px * var(--custom-zoom, 1)));
+    height: calc(118px * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .topbar {
@@ -5718,7 +5737,8 @@ textarea {
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-picker button,
   body:not(.custom-printing) .app-shell.custom-mode .custom-text-add button,
-  body:not(.custom-printing) .app-shell.custom-mode .custom-print-button {
+  body:not(.custom-printing) .app-shell.custom-mode .custom-print-button,
+  body:not(.custom-printing) .app-shell.custom-mode .custom-pdf-button {
     min-height: 54px;
     padding-inline: 18px;
     font-size: 1.02rem;
@@ -5767,9 +5787,9 @@ textarea {
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-grid {
-    gap: 16px;
-    min-height: 220px;
-    padding: 16px;
+    gap: calc(16px * var(--custom-zoom, 1));
+    min-height: calc(220px * var(--custom-zoom, 1));
+    padding: calc(16px * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-grid.empty {
@@ -5777,8 +5797,8 @@ textarea {
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card {
-    min-height: 250px;
-    padding: 20px 16px 18px;
+    min-height: calc(250px * var(--custom-zoom, 1));
+    padding: calc(20px * var(--custom-zoom, 1)) calc(16px * var(--custom-zoom, 1)) calc(18px * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-card-head {
@@ -5786,12 +5806,12 @@ textarea {
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card strong {
-    font-size: 2rem;
+    font-size: calc(2rem * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-card-voicing,
   body:not(.custom-printing) .app-shell.custom-mode .custom-start-voicing {
-    font-size: 1rem;
+    font-size: calc(1rem * var(--custom-zoom, 1));
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-start-voicing select {
@@ -5801,9 +5821,9 @@ textarea {
   }
 
   body:not(.custom-printing) .app-shell.custom-mode .custom-chord-card .mini-keyboard {
-    width: 100%;
-    max-width: 360px;
-    height: 124px;
+    width: min(100%, calc(360px * var(--custom-zoom, 1)));
+    max-width: 100%;
+    height: calc(124px * var(--custom-zoom, 1));
     justify-self: center;
   }
 
@@ -5866,6 +5886,14 @@ textarea {
 
   .selected-song-measure.has-inline-meter {
     padding-left: 46px;
+  }
+
+  .selected-song-measure.has-inline-meter.repeat-start {
+    padding-left: 70px;
+  }
+
+  .selected-song-measure.has-inline-meter.repeat-start .selected-song-meter {
+    left: 21px;
   }
 
   .selected-song-meter {
@@ -6381,7 +6409,8 @@ body.print-layout-probe .song-notation {
   body.custom-printing .custom-chord-workspace-head,
   body.custom-printing .custom-start-voicing,
   body.custom-printing .custom-remove,
-  body.custom-printing .custom-print-button {
+  body.custom-printing .custom-print-button,
+  body.custom-printing .custom-pdf-button {
     display: none !important;
   }
 
@@ -6675,8 +6704,18 @@ body.print-layout-probe .song-notation {
 
 .schema-chord-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(120px, 1fr) minmax(68px, 0.42fr) minmax(68px, 0.42fr) 32px;
   gap: 6px;
+  align-items: end;
+}
+
+.schema-chord-row label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .schema-chord-row input {
@@ -6687,6 +6726,11 @@ body.print-layout-probe .song-notation {
   font: inherit;
   font-weight: 800;
   background: #fff;
+}
+
+.schema-chord-row input[type="number"] {
+  padding-inline: 6px;
+  text-align: center;
 }
 
 .schema-remove-chord {
@@ -6714,5 +6758,9 @@ body.print-layout-probe .song-notation {
 
   .schema-measure-grid {
     grid-template-columns: 1fr;
+  }
+
+  .schema-chord-row {
+    grid-template-columns: minmax(0, 1fr) 64px 64px 32px;
   }
 }

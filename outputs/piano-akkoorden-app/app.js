@@ -627,6 +627,7 @@ const customAddTypedChordButton = document.querySelector("#customAddTypedChordBu
 const customAddChordButton = document.querySelector("#customAddChordButton");
 const customResetButton = document.querySelector("#customResetButton");
 const customPrintButton = document.querySelector("#customPrintButton");
+const customPdfButton = document.querySelector("#customPdfButton");
 const customZoomOut = document.querySelector("#customZoomOut");
 const customZoomIn = document.querySelector("#customZoomIn");
 const customZoomRange = document.querySelector("#customZoomRange");
@@ -3091,18 +3092,49 @@ function editableSectionMeasures(section) {
   return [];
 }
 
-function chordEntryWithToken(entry, token) {
+function formatSchemaNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return String(Math.round(number * 100) / 100);
+}
+
+function parseSchemaNumber(value) {
+  const number = Number(String(value || "").replace(",", "."));
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function schemaEntryTiming(entry, measure) {
+  if (typeof entry !== "object" || entry === null || (entry.beats == null && entry.startBeat == null)) {
+    return { startBeat: "", beats: "" };
+  }
+  const timing = visualTimingFromEntry(entry, measureMeter(measure));
+  return {
+    startBeat: formatSchemaNumber(timing.startBeat),
+    beats: formatSchemaNumber(timing.beats)
+  };
+}
+
+function chordEntryWithToken(entry, token, timing = {}) {
   const value = String(token || "").trim();
   if (!value) return "";
-  if (typeof entry === "string" || typeof entry === "number") return value;
-  if (typeof entry !== "object" || entry === null) return value;
-  const next = { ...entry };
+  const hasTiming = Number.isFinite(timing.startBeat) || Number.isFinite(timing.beats);
+  if ((typeof entry === "string" || typeof entry === "number" || typeof entry !== "object" || entry === null) && !hasTiming) {
+    return value;
+  }
+  const next = typeof entry === "object" && entry !== null ? { ...entry } : { token: value };
   if ("token" in next) next.token = value;
   else if ("symbol" in next) next.symbol = value;
   else if ("chord" in next) next.chord = value;
   else if ("name" in next) next.name = value;
   else if ("label" in next) next.label = value;
   else next.token = value;
+  if (hasTiming) {
+    if (Number.isFinite(timing.startBeat)) next.startBeat = timing.startBeat;
+    else delete next.startBeat;
+    if (Number.isFinite(timing.beats)) next.beats = timing.beats;
+    else delete next.beats;
+    delete next.timingUnit;
+  }
   return next;
 }
 
@@ -3112,10 +3144,23 @@ function setEditableMeasureChords(measure, chords) {
   return { chords };
 }
 
-function schemaChordRowHtml(sectionIndex, measureIndex, originalIndex, token = "") {
+function schemaChordRowHtml(sectionIndex, measureIndex, originalIndex, entry = "", measure = null) {
+  const token = chordEntryToken(entry);
+  const timing = schemaEntryTiming(entry, measure);
   return `
     <div class="schema-chord-row" data-section-index="${sectionIndex}" data-measure-index="${measureIndex}" data-original-index="${originalIndex}">
-      <input type="text" value="${escapeAttribute(token)}" aria-label="Akkoord">
+      <label>
+        <span>Akkoord</span>
+        <input class="schema-chord-token" type="text" value="${escapeAttribute(token)}" aria-label="Akkoord">
+      </label>
+      <label>
+        <span>Start</span>
+        <input class="schema-chord-start" type="number" min="1" step="0.25" value="${escapeAttribute(timing.startBeat)}" aria-label="Starttel">
+      </label>
+      <label>
+        <span>Tellen</span>
+        <input class="schema-chord-beats" type="number" min="0.25" step="0.25" value="${escapeAttribute(timing.beats)}" aria-label="Aantal tellen">
+      </label>
       <button type="button" class="schema-remove-chord" data-schema-action="remove-chord" aria-label="Verwijder akkoord">×</button>
     </div>`;
 }
@@ -3867,7 +3912,7 @@ function renderSongSchemaEditor() {
     const measureCards = measures.map((measure, measureIndex) => {
       const entries = measureChordEntries(measure);
       const rows = entries
-        .map((entry, chordIndex) => schemaChordRowHtml(sectionIndex, measureIndex, chordIndex, chordEntryToken(entry)))
+        .map((entry, chordIndex) => schemaChordRowHtml(sectionIndex, measureIndex, chordIndex, entry, measure))
         .join("");
       return `
         <article class="schema-measure-card" data-section-index="${sectionIndex}" data-measure-index="${measureIndex}">
@@ -3940,11 +3985,15 @@ function buildEditedSongFromSchemaForm(song) {
   const rowsByMeasure = new Map();
   songSchemaEditor?.querySelectorAll(".schema-chord-row").forEach((row) => {
     const key = `${row.dataset.sectionIndex}:${row.dataset.measureIndex}`;
-    const value = row.querySelector("input")?.value.trim() || "";
+    const value = row.querySelector(".schema-chord-token")?.value.trim() || "";
+    const startBeat = parseSchemaNumber(row.querySelector(".schema-chord-start")?.value);
+    const beats = parseSchemaNumber(row.querySelector(".schema-chord-beats")?.value);
     if (!rowsByMeasure.has(key)) rowsByMeasure.set(key, []);
     if (value) rowsByMeasure.get(key).push({
       originalIndex: Number(row.dataset.originalIndex),
-      token: value
+      token: value,
+      startBeat,
+      beats
     });
   });
   sections.forEach((section, sectionIndex) => {
@@ -3955,7 +4004,10 @@ function buildEditedSongFromSchemaForm(song) {
       const edits = rowsByMeasure.get(`${sectionIndex}:${measureIndex}`) || [];
       const chords = edits.map((edit) => {
         const original = edit.originalIndex >= 0 ? originalEntries[edit.originalIndex] : null;
-        return chordEntryWithToken(original, edit.token);
+        return chordEntryWithToken(original, edit.token, {
+          startBeat: edit.startBeat,
+          beats: edit.beats
+        });
       }).filter(Boolean);
       return setEditableMeasureChords(measure, chords);
     });
@@ -4885,7 +4937,7 @@ function clearSelectedInspirationSong() {
 function renderChordSequenceNotation() {
   if (!chordSequenceNotation) return;
   chordSequenceNotation.innerHTML = "";
-  if (!state.chordSequence.length || state.selectedInspirationSong) return;
+  if (!state.chordSequence.length) return;
   state.chordSequence.forEach((chord, index) => {
     const staff = document.createElement("div");
     staff.className = "song-notation chord-sequence-staff";
@@ -4902,14 +4954,9 @@ function renderChordSequenceNotation() {
 
 function renderChordSequence() {
   if (!chordSequencePanel || !chordSequenceList) return;
-  const visible = !state.selectedInspirationSong;
-  chordSequencePanel.hidden = !visible;
-  if (addChordSequence) addChordSequence.disabled = !visible;
+  chordSequencePanel.hidden = false;
+  if (addChordSequence) addChordSequence.disabled = false;
   chordSequenceList.innerHTML = "";
-  if (!visible) {
-    renderChordSequenceNotation();
-    return;
-  }
   chordSequenceList.classList.toggle("empty", state.chordSequence.length === 0);
   if (!state.chordSequence.length) {
     chordSequenceList.textContent = "Kies een akkoord en klik op Voeg toe";
@@ -7336,11 +7383,14 @@ authClient?.auth.onAuthStateChange((event) => {
   }
 });
 
-customPrintButton?.addEventListener("click", () => {
+function openCustomPrintView() {
   customState.isPrinting = true;
   document.body.classList.add("custom-printing");
   window.print();
-});
+}
+
+customPrintButton?.addEventListener("click", openCustomPrintView);
+customPdfButton?.addEventListener("click", openCustomPrintView);
 
 pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
