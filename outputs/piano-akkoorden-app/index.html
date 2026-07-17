@@ -252,32 +252,8 @@
             </div>
             <div class="song-library-stats-grid" id="songLibraryStatsGrid"></div>
           </section>
-          <details class="access-code-admin" data-admin-only hidden>
-            <summary>Toegangscodes</summary>
-            <form class="access-code-admin-form" id="accessCodeAdminForm">
-              <label>
-                Omschrijving
-                <input id="accessCodeLabel" type="text" autocomplete="off" placeholder="Zomertest leerlingen">
-              </label>
-              <label>
-                Klascode
-                <input id="accessCodeAdminCode" type="text" autocomplete="off" placeholder="ZOMER2026" required>
-              </label>
-              <label>
-                Max leerlingen
-                <input id="accessCodeMaxUses" type="number" min="1" inputmode="numeric" placeholder="50">
-              </label>
-              <label>
-                Einddatum
-                <input id="accessCodeExpiresAt" type="date" required>
-              </label>
-              <button type="submit">Maak code</button>
-            </form>
-            <p class="access-code-admin-status" id="accessCodeAdminStatus" aria-live="polite"></p>
-            <div class="access-code-list" id="accessCodeList"></div>
-          </details>
-          <details class="song-add-panel" data-admin-only hidden>
-            <summary>Liedje toevoegen</summary>
+          <section class="song-add-panel" data-admin-only hidden>
+            <h3>Liedje toevoegen</h3>
             <form class="song-add-form" id="addSongForm">
               <div class="song-add-grid">
                 <label>
@@ -332,6 +308,30 @@
               </div>
               <p id="addSongStatus" aria-live="polite"></p>
             </form>
+          </section>
+          <details class="access-code-admin" data-admin-only hidden>
+            <summary>Toegangscodes</summary>
+            <form class="access-code-admin-form" id="accessCodeAdminForm">
+              <label>
+                Omschrijving
+                <input id="accessCodeLabel" type="text" autocomplete="off" placeholder="Zomertest leerlingen">
+              </label>
+              <label>
+                Klascode
+                <input id="accessCodeAdminCode" type="text" autocomplete="off" placeholder="ZOMER2026" required>
+              </label>
+              <label>
+                Max leerlingen
+                <input id="accessCodeMaxUses" type="number" min="1" inputmode="numeric" placeholder="50">
+              </label>
+              <label>
+                Einddatum
+                <input id="accessCodeExpiresAt" type="date" required>
+              </label>
+              <button type="submit">Maak code</button>
+            </form>
+            <p class="access-code-admin-status" id="accessCodeAdminStatus" aria-live="polite"></p>
+            <div class="access-code-list" id="accessCodeList"></div>
           </details>
           <p class="inspiration-status" id="inspirationStatus" aria-live="polite"></p>
         </section>

@@ -103,6 +103,7 @@ const qualities = [
   { id: "aug", name: "overmatig", symbol: "aug", intervals: [0, 4, 8], degrees: ["1", "3", "#5"] },
   { id: "sus2", name: "sus2", symbol: "sus2", intervals: [0, 2, 7], degrees: ["1", "2", "5"] },
   { id: "sus4", name: "sus4", symbol: "sus4", intervals: [0, 5, 7], degrees: ["1", "4", "5"] },
+  { id: "7sus4", name: "7sus4", symbol: "7sus4", intervals: [0, 5, 7, 10], degrees: ["1", "4", "5", "b7"] },
   { id: "maj7", name: "majeur 7", symbol: "maj7", intervals: [0, 4, 7, 11], degrees: ["1", "3", "5", "7"] },
   { id: "7", name: "dominant 7", symbol: "7", intervals: [0, 4, 7, 10], degrees: ["1", "3", "5", "b7"] },
   { id: "min7", name: "mineur 7", symbol: "m7", intervals: [0, 3, 7, 10], degrees: ["1", "b3", "5", "b7"] },
@@ -717,6 +718,48 @@ function chordSymbol(root, quality) {
   return `${root.label}${quality.symbol}`;
 }
 
+const chordSuggestionListId = "chordSuggestionList";
+
+function chordAutocompleteSymbols() {
+  const seen = new Set();
+  const symbols = [];
+  rootOptions.forEach((root) => {
+    qualities.forEach((quality) => {
+      const symbol = chordSymbol(root, quality);
+      if (!symbol || seen.has(symbol)) return;
+      seen.add(symbol);
+      symbols.push(symbol);
+    });
+  });
+  return symbols;
+}
+
+function ensureChordSuggestionList() {
+  let list = document.getElementById(chordSuggestionListId);
+  if (!list) {
+    list = document.createElement("datalist");
+    list.id = chordSuggestionListId;
+    document.body.append(list);
+  }
+  if (list.dataset.ready === "true") return list;
+  list.innerHTML = "";
+  chordAutocompleteSymbols().forEach((symbol) => {
+    const option = document.createElement("option");
+    option.value = symbol;
+    list.append(option);
+  });
+  list.dataset.ready = "true";
+  return list;
+}
+
+function attachChordAutocomplete(scope = document) {
+  const list = ensureChordSuggestionList();
+  scope.querySelectorAll("#customChordText, .schema-chord-token, input[data-chord-autocomplete]").forEach((input) => {
+    input.setAttribute("list", list.id);
+    input.setAttribute("autocomplete", "off");
+  });
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
@@ -771,6 +814,10 @@ function qualityFromSymbol(symbol) {
     ["+", "aug"],
     ["sus2", "sus2"],
     ["sus4", "sus4"],
+    ["7sus4", "7sus4"],
+    ["sus47", "7sus4"],
+    ["sus4add7", "7sus4"],
+    ["sus7", "7sus4"],
     ["maj7", "maj7"],
     ["M7", "maj7"],
     ["7", "7"],
@@ -1253,6 +1300,9 @@ function bestRootAbsoluteForScale(root, quality, inversion, scale) {
 }
 
 function bestRootAbsoluteForNotation(root, quality, inversion) {
+  if (root?.pitch === 0 && quality?.id === "maj" && Number(inversion) === 0) {
+    return 0;
+  }
   const candidates = [];
   for (let octaveShift = -3; octaveShift <= 4; octaveShift += 1) {
     const rootAbsolute = root.pitch + octaveShift * 12;
@@ -1494,6 +1544,10 @@ function chordNotationLedgerScore(notes) {
 }
 
 function readableChordNotationNotes(notes) {
+  const absolutes = notes.map((note) => note.absolute).sort((a, b) => a - b);
+  if (absolutes.length === 3 && absolutes[0] === 0 && absolutes[1] === 4 && absolutes[2] === 7) {
+    return notes;
+  }
   const candidates = [-24, -12, 0, 12, 24].map((shift) => {
     const shifted = notes.map((note) => ({ ...note, absolute: note.absolute + shift }));
     return {
@@ -2490,7 +2544,8 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
     return false;
   }
 
-  setAuthView("auth-loading");
+  const wasUnlocked = document.body.classList.contains("auth-unlocked");
+  if (!wasUnlocked) setAuthView("auth-loading");
   const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
   if (sessionError) {
     clearAdminAccess();
@@ -3376,7 +3431,8 @@ function chordSearchQualityFamily(quality) {
   if (["min", "min7", "min6", "min9"].includes(quality.id)) return "min";
   if (["dim", "dim7", "m7b5"].includes(quality.id)) return "dim";
   if (quality.id === "aug") return "aug";
-  if (["sus2", "sus4"].includes(quality.id)) return quality.id;
+  if (quality.id === "sus2") return "sus2";
+  if (["sus4", "7sus4"].includes(quality.id)) return "sus4";
   return "maj";
 }
 
@@ -3721,7 +3777,42 @@ function selectedSongYoutubePlayer(song) {
   return player;
 }
 
-function selectedSongMediaPlayer(song) {
+function captureSelectedSongMediaState() {
+  const audio = selectedSongChordList?.querySelector(".selected-song-media audio");
+  if (!audio) return null;
+  const sourceId = audio.dataset.mediaSource || audio.currentSrc || audio.getAttribute("src") || "";
+  return {
+    sourceId,
+    currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+    playing: !audio.paused && !audio.ended
+  };
+}
+
+function restoreNootstudioAudioState(player, restoreState) {
+  if (!player || !restoreState) return;
+  const audio = player.querySelector("audio");
+  if (!audio) return;
+  const sourceId = audio.dataset.mediaSource || audio.currentSrc || audio.getAttribute("src") || "";
+  if (!restoreState.sourceId || restoreState.sourceId !== sourceId) return;
+  let restored = false;
+  const restore = () => {
+    if (restored) return;
+    restored = true;
+    const targetTime = Number(restoreState.currentTime) || 0;
+    if (targetTime > 0) {
+      try {
+        audio.currentTime = audio.duration ? Math.min(targetTime, Math.max(0, audio.duration - 0.05)) : targetTime;
+      } catch {
+        // Some browsers reject currentTime before enough metadata is available.
+      }
+    }
+    if (restoreState.playing) audio.play().catch(() => {});
+  };
+  audio.addEventListener("loadedmetadata", restore, { once: true });
+  if (audio.readyState >= 1) restore();
+}
+
+function selectedSongMediaPlayer(song, restoreState = null) {
   if (!song?.mediaKey && !song?.mediaUrl) return null;
   const wrapper = document.createElement("div");
   wrapper.className = "selected-song-media";
@@ -3730,8 +3821,10 @@ function selectedSongMediaPlayer(song) {
     if (isVideo) {
       wrapper.innerHTML = `<video controls src="${escapeHtml(song.mediaUrl)}"></video>`;
     } else {
-      wrapper.innerHTML = nootstudioAudioPlayerHtml(escapeHtml(song.mediaUrl));
-      setupNootstudioAudioPlayer(wrapper.querySelector(".nootstudio-player"));
+      wrapper.innerHTML = nootstudioAudioPlayerHtml(song.mediaUrl, song.mediaUrl);
+      const player = wrapper.querySelector(".nootstudio-player");
+      setupNootstudioAudioPlayer(player);
+      restoreNootstudioAudioState(player, restoreState);
     }
     return wrapper;
   }
@@ -3747,8 +3840,10 @@ function selectedSongMediaPlayer(song) {
       if (isVideo) {
         wrapper.innerHTML = `<video controls src="${source}"></video>`;
       } else {
-        wrapper.innerHTML = nootstudioAudioPlayerHtml(source);
-        setupNootstudioAudioPlayer(wrapper.querySelector(".nootstudio-player"));
+        wrapper.innerHTML = nootstudioAudioPlayerHtml(source, song.mediaKey || source);
+        const player = wrapper.querySelector(".nootstudio-player");
+        setupNootstudioAudioPlayer(player);
+        restoreNootstudioAudioState(player, restoreState);
       }
     })
     .catch(() => {
@@ -3764,10 +3859,10 @@ function formatMediaTime(seconds) {
   return `${minutes}:${rest}`;
 }
 
-function nootstudioAudioPlayerHtml(source) {
+function nootstudioAudioPlayerHtml(source, mediaSourceId = source) {
   return `
     <div class="nootstudio-player">
-      <audio src="${source}" preload="metadata"></audio>
+      <audio src="${escapeHtml(source)}" data-media-source="${escapeHtml(mediaSourceId)}" preload="metadata"></audio>
       <img class="nootstudio-player-logo" src="assets/nootstudio-n.png" alt="">
       <button class="nootstudio-player-button" type="button" aria-label="Speel audio">
         <span aria-hidden="true"></span>
@@ -3912,8 +4007,9 @@ function renderSelectedInspirationSong() {
     const transposeKey = keyOptionFromLabel(selectedSongTransposeKeyLabel(song)) || state.key;
     selectedSongTranspose.value = String(keyOptions.indexOf(transposeKey));
   }
+  const mediaState = captureSelectedSongMediaState();
   selectedSongChordList.innerHTML = "";
-  const mediaPlayer = selectedSongMediaPlayer(song);
+  const mediaPlayer = selectedSongMediaPlayer(song, mediaState);
   const youtubePlayer = selectedSongYoutubePlayer(song);
   const appendSongMedia = () => {
     if (mediaPlayer) selectedSongChordList.append(mediaPlayer);
@@ -5124,7 +5220,7 @@ function addChordToSequence(chord) {
     ? [chord, ...state.chordSequence.slice(0, 3)]
     : [...state.chordSequence, chord];
   state.chordSequence = rebuildChordSequence(nextSequence);
-  applyDegreeChord(chord, { record: false, focus: false });
+  applyDegreeChord(chord, { record: false, focus: false, preserveSelectedSong: true });
 }
 
 function clearChordSequence() {
@@ -5191,7 +5287,11 @@ function renderChordSequence() {
           : item
       ));
       state.chordSequence = rebuildChordSequence(nextSequence);
-      applyDegreeChord({ ...chord, inversion: Number(nextOption.value) }, { record: false, focus: false });
+      applyDegreeChord({ ...chord, inversion: Number(nextOption.value) }, {
+        record: false,
+        focus: false,
+        preserveSelectedSong: true
+      });
       render();
     });
     chordSequenceList.append(button);
@@ -5465,7 +5565,13 @@ function updateChordNotationPanel(notes, title = "") {
   renderChordNotation(chordNotationStaff);
 }
 
-function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus = true, scrollTarget = "detail" } = {}) {
+function applyDegreeChord(chord, {
+  record = true,
+  useChordVoicing = false,
+  focus = true,
+  scrollTarget = "detail",
+  preserveSelectedSong = false
+} = {}) {
   const matchingRoot = rootOptions.find((root) => root.label === chord.root)
     || rootOptions.find((root) => root.pitch === chord.rootPitch)
     || state.root;
@@ -5481,7 +5587,7 @@ function applyDegreeChord(chord, { record = true, useChordVoicing = false, focus
     ? (chord.selectedRootAbsolute ?? chord.rootAbsolute)
     : (Number.isFinite(chord.rootAbsolute) ? chord.rootAbsolute : null);
   state.chordActive = true;
-  state.selectedInspirationSong = null;
+  if (!preserveSelectedSong) state.selectedInspirationSong = null;
   state.selectedModulationChord = null;
   if (record) addChordToSequence(chord);
   if (focus) requestKeyboardFocus();
@@ -6270,6 +6376,7 @@ function musicXmlChordSymbol(harmony) {
   let suffix = kindMap.find(([pattern]) => pattern.test(kind))?.[1] ?? "";
   degreeValues.forEach((degree) => {
     if (degree.type === "add" && degree.value === "9") suffix = suffix || "add9";
+    if (degree.type === "add" && degree.value === "7" && suffix === "sus4") suffix = "7sus4";
     if (degree.type === "alter" && degree.value === "5" && degree.alter === "-1" && suffix === "m7") suffix = "m7b5";
   });
   const bass = bassStep ? `${bassStep}${bassAlter > 0 ? "#" : bassAlter < 0 ? "b" : ""}` : "";
@@ -6371,7 +6478,7 @@ function musicXmlInferChordFromNotes(notesInput, keyLabel) {
   const pitchSet = new Set(pitchCounts.keys());
   const scale = majorScaleForKeyLabel(keyLabel);
   const diatonicTriads = degreeTriads(scale.notes);
-  const candidateQualities = ["maj", "min", "dim", "sus2", "sus4", "7", "min7", "maj7", "9", "min9", "maj9"]
+  const candidateQualities = ["maj", "min", "dim", "sus2", "sus4", "7sus4", "7", "min7", "maj7", "9", "min9", "maj9"]
     .map((id) => qualities.find((quality) => quality.id === id))
     .filter(Boolean);
   const rootPitches = [...new Set([
@@ -7326,6 +7433,7 @@ function render() {
   renderGrid();
   renderSong();
   renderCustomComposer();
+  attachChordAutocomplete();
   if (!state.chordActive && state.chordMode !== "search") {
     centerCurrentScaleOnKeyboard();
   }
