@@ -125,6 +125,68 @@ body.auth-unlocked .auth-gate {
   color: #9d1d1d;
 }
 
+.access-code-card {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(106, 111, 118, 0.18);
+}
+
+.access-code-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.access-code-card p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.access-code-form {
+  display: grid;
+  gap: 8px;
+}
+
+.access-code-form label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.access-code-form input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+}
+
+.access-code-form button {
+  justify-self: start;
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 18px;
+  background: var(--accent);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+}
+
+.access-code-form button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.access-code-status {
+  margin-top: 10px !important;
+}
+
 .auth-logout {
   padding: 8px 12px;
   background: #efede6;
@@ -3145,6 +3207,177 @@ textarea {
 
 .song-add-panel[open] summary::after {
   content: "⌃";
+}
+
+.access-code-admin {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(106, 111, 118, 0.18);
+}
+
+.access-code-admin summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  border: 1px solid rgba(106, 111, 118, 0.22);
+  border-radius: 999px;
+  padding: 0 14px;
+  color: var(--muted);
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  list-style: none;
+}
+
+.access-code-admin summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-code-admin summary::after {
+  content: "⌄";
+  color: var(--accent-strong);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.access-code-admin[open] summary::after {
+  content: "⌃";
+}
+
+.access-code-admin-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.access-code-admin-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.access-code-admin-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #fff;
+  font: inherit;
+  font-weight: 800;
+}
+
+.access-code-admin-form button {
+  align-self: end;
+  min-height: 38px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 14px;
+  background: var(--accent);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 950;
+}
+
+.access-code-admin-status {
+  min-height: 1.2em;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.access-code-admin-status.is-error,
+.access-code-empty.is-error {
+  color: #951b81;
+}
+
+.access-code-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.access-code-item {
+  border: 1px solid rgba(106, 111, 118, 0.16);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.access-code-item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.access-code-item h4 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.access-code-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.access-code-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 0 10px;
+  background: rgba(213, 165, 29, 0.18);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.access-code-students {
+  margin-top: 10px;
+  border-top: 1px solid rgba(106, 111, 118, 0.12);
+}
+
+.access-code-student {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.access-code-student strong {
+  color: var(--ink);
+}
+
+.access-code-empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+@media (max-width: 760px) {
+  .access-code-admin-form {
+    grid-template-columns: 1fr;
+  }
+
+  .access-code-item-header,
+  .access-code-student {
+    display: grid;
+  }
 }
 
 .song-add-form {

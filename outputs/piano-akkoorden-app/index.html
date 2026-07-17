@@ -19,6 +19,18 @@
             <button id="authSubmit" type="submit">Stuur loginlink</button>
           </div>
         </form>
+        <div class="access-code-card">
+          <h2>Ik heb een klascode</h2>
+          <p>Activeer tijdelijke toegang met je e-mailadres en klascode.</p>
+          <form class="access-code-form" id="accessCodeForm">
+            <label for="accessCodeEmail">E-mailadres</label>
+            <input id="accessCodeEmail" type="email" autocomplete="email" placeholder="jij@voorbeeld.nl" required>
+            <label for="accessCodeInput">Klascode</label>
+            <input id="accessCodeInput" type="text" autocomplete="one-time-code" placeholder="Bijv. ZOMER2026" required>
+            <button id="accessCodeSubmit" type="submit">Activeer toegang</button>
+          </form>
+          <p class="auth-status access-code-status" id="accessCodeStatus"></p>
+        </div>
         <p class="auth-status" id="authStatus">Je ontvangt een veilige link per e-mail. Op dit apparaat blijf je daarna ingelogd.</p>
       </div>
     </section>
@@ -240,6 +252,30 @@
             </div>
             <div class="song-library-stats-grid" id="songLibraryStatsGrid"></div>
           </section>
+          <details class="access-code-admin" data-admin-only hidden>
+            <summary>Toegangscodes</summary>
+            <form class="access-code-admin-form" id="accessCodeAdminForm">
+              <label>
+                Omschrijving
+                <input id="accessCodeLabel" type="text" autocomplete="off" placeholder="Zomertest leerlingen">
+              </label>
+              <label>
+                Klascode
+                <input id="accessCodeAdminCode" type="text" autocomplete="off" placeholder="ZOMER2026" required>
+              </label>
+              <label>
+                Max leerlingen
+                <input id="accessCodeMaxUses" type="number" min="1" inputmode="numeric" placeholder="50">
+              </label>
+              <label>
+                Einddatum
+                <input id="accessCodeExpiresAt" type="date" required>
+              </label>
+              <button type="submit">Maak code</button>
+            </form>
+            <p class="access-code-admin-status" id="accessCodeAdminStatus" aria-live="polite"></p>
+            <div class="access-code-list" id="accessCodeList"></div>
+          </details>
           <details class="song-add-panel" data-admin-only hidden>
             <summary>Liedje toevoegen</summary>
             <form class="song-add-form" id="addSongForm">

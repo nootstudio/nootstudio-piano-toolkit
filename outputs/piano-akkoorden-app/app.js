@@ -137,7 +137,9 @@ const state = {
   libraryOpen: false,
   isAdmin: false,
   currentUserEmail: "",
-  schemaEditMode: false
+  schemaEditMode: false,
+  accessCodes: [],
+  accessCodesLoaded: false
 };
 
 function defaultSongSections() {
@@ -643,6 +645,18 @@ const authSubmit = document.querySelector("#authSubmit");
 const authStatus = document.querySelector("#authStatus");
 const authLogout = document.querySelector("#authLogout");
 const mobileAuthLogout = document.querySelector("#mobileAuthLogout");
+const accessCodeForm = document.querySelector("#accessCodeForm");
+const accessCodeEmail = document.querySelector("#accessCodeEmail");
+const accessCodeInput = document.querySelector("#accessCodeInput");
+const accessCodeSubmit = document.querySelector("#accessCodeSubmit");
+const accessCodeStatus = document.querySelector("#accessCodeStatus");
+const accessCodeAdminForm = document.querySelector("#accessCodeAdminForm");
+const accessCodeAdminStatus = document.querySelector("#accessCodeAdminStatus");
+const accessCodeList = document.querySelector("#accessCodeList");
+const accessCodeLabel = document.querySelector("#accessCodeLabel");
+const accessCodeAdminCode = document.querySelector("#accessCodeAdminCode");
+const accessCodeMaxUses = document.querySelector("#accessCodeMaxUses");
+const accessCodeExpiresAt = document.querySelector("#accessCodeExpiresAt");
 
 function syncChordNotationPlacement() {
   return;
@@ -2238,6 +2252,131 @@ function setAuthStatus(message, isError = false) {
   authStatus.classList.toggle("is-error", Boolean(isError));
 }
 
+function setAccessCodeStatus(message, isError = false) {
+  if (!accessCodeStatus) return;
+  accessCodeStatus.textContent = message;
+  accessCodeStatus.classList.toggle("is-error", Boolean(isError));
+}
+
+function setAccessCodeAdminStatus(message, isError = false) {
+  if (!accessCodeAdminStatus) return;
+  accessCodeAdminStatus.textContent = message;
+  accessCodeAdminStatus.classList.toggle("is-error", Boolean(isError));
+}
+
+function functionEndpoint(name) {
+  return `/.netlify/functions/${name}`;
+}
+
+async function functionJson(name, { method = "GET", body, auth = false } = {}) {
+  const headers = { "content-type": "application/json" };
+  if (auth && authAccessToken) headers.Authorization = `Bearer ${authAccessToken}`;
+  const response = await fetch(functionEndpoint(name), {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      throw new Error("Ongeldig antwoord van de server.");
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data.error || `Verzoek mislukt (${response.status})`);
+  }
+  return data;
+}
+
+function normalizeAccessCodeUi(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function formatAccessDate(value) {
+  if (!value) return "geen einddatum";
+  return new Date(value).toLocaleDateString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function formatAccessDateTime(value) {
+  if (!value) return "nog niet gezien";
+  return new Date(value).toLocaleString("nl-NL", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+async function touchLastSeen() {
+  if (!authClient || isLocalDevBypass()) return;
+  try {
+    await authClient.rpc("touch_profile_last_seen");
+  } catch (error) {
+    console.warn("last seen update failed", error);
+  }
+}
+
+async function loadAccessCodesAdmin({ force = false } = {}) {
+  if (!state.isAdmin || !accessCodeList) return;
+  if (isLocalDevBypass()) {
+    accessCodeList.innerHTML = `<p class="access-code-empty">Toegangscodes werken online met Supabase.</p>`;
+    return;
+  }
+  if (state.accessCodesLoaded && !force) return;
+  state.accessCodesLoaded = true;
+  accessCodeList.innerHTML = `<p class="access-code-empty">Toegangscodes laden...</p>`;
+  try {
+    const data = await functionJson("admin-access-codes", { auth: true });
+    state.accessCodes = data.codes || [];
+    renderAccessCodesAdmin();
+  } catch (error) {
+    accessCodeList.innerHTML = `<p class="access-code-empty is-error">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function renderAccessCodesAdmin() {
+  if (!accessCodeList) return;
+  if (!state.accessCodes.length) {
+    accessCodeList.innerHTML = `<p class="access-code-empty">Nog geen toegangscodes.</p>`;
+    return;
+  }
+  const now = Date.now();
+  accessCodeList.innerHTML = state.accessCodes.map((code) => {
+    const redemptions = Array.isArray(code.redemptions) ? code.redemptions : [];
+    const maxUses = code.max_uses || "∞";
+    const expired = code.expires_at && new Date(code.expires_at).getTime() < now;
+    const activeLabel = code.active && !expired ? "Actief" : "Niet actief";
+    const studentRows = redemptions.length
+      ? redemptions.map((redemption) => `
+          <div class="access-code-student">
+            <strong>${escapeHtml(redemption.email || "Onbekend")}</strong>
+            <span>Actief sinds ${escapeHtml(formatAccessDateTime(redemption.claimed_at))}</span>
+            <span>Laatst gezien ${escapeHtml(formatAccessDateTime(redemption.last_seen_at))}</span>
+          </div>
+        `).join("")
+      : `<p class="access-code-empty">Nog geen leerlingen.</p>`;
+    return `
+      <article class="access-code-item">
+        <div class="access-code-item-header">
+          <div>
+            <h4>${escapeHtml(code.label || code.code)}</h4>
+            <p>Code <strong>${escapeHtml(code.code)}</strong> · geldig tot ${escapeHtml(formatAccessDate(code.expires_at))}</p>
+          </div>
+          <span class="access-code-pill">${escapeHtml(String(code.usedCount || 0))} / ${escapeHtml(String(maxUses))} · ${escapeHtml(activeLabel)}</span>
+        </div>
+        <div class="access-code-students">${studentRows}</div>
+      </article>
+    `;
+  }).join("");
+}
+
 function setAuthView(mode) {
   document.body.classList.remove("auth-loading", "auth-locked", "auth-unlocked");
   document.body.classList.add(mode);
@@ -2262,6 +2401,8 @@ function clearAdminAccess() {
   state.isAdmin = false;
   state.currentUserEmail = "";
   state.schemaEditMode = false;
+  state.accessCodes = [];
+  state.accessCodesLoaded = false;
   updateAdminUi();
 }
 
@@ -2312,6 +2453,11 @@ function updateAdminUi() {
   if (!isAdmin) state.schemaEditMode = false;
   renderSongSchemaEditor();
   renderSongLibraryStats();
+  if (isAdmin) {
+    loadAccessCodesAdmin().catch((error) => console.warn("access codes load failed", error));
+  } else if (accessCodeList) {
+    accessCodeList.innerHTML = "";
+  }
 }
 
 async function claimCurrentUserEntitlements() {
@@ -2376,6 +2522,7 @@ async function refreshAuthAccess({ showWelcome = false } = {}) {
 
     setAuthView("auth-unlocked");
     setAuthStatus(showWelcome ? "Je bent ingelogd. De app is geopend." : "");
+    touchLastSeen();
     loadRemoteSongLibrary();
     return true;
   } catch (error) {
@@ -7418,6 +7565,76 @@ authForm?.addEventListener("submit", async (event) => {
     console.warn("auth magic link failed", error);
   } finally {
     authSubmit.disabled = false;
+  }
+});
+
+accessCodeInput?.addEventListener("input", () => {
+  accessCodeInput.value = normalizeAccessCodeUi(accessCodeInput.value);
+});
+
+accessCodeAdminCode?.addEventListener("input", () => {
+  accessCodeAdminCode.value = normalizeAccessCodeUi(accessCodeAdminCode.value);
+});
+
+accessCodeForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!authClient || !accessCodeEmail || !accessCodeInput || !accessCodeSubmit) {
+    setAccessCodeStatus("Klascodes zijn nog niet beschikbaar. Controleer de Supabase-instellingen.", true);
+    return;
+  }
+
+  const email = accessCodeEmail.value.trim().toLowerCase();
+  const code = normalizeAccessCodeUi(accessCodeInput.value);
+  if (!email || !code) return;
+
+  accessCodeSubmit.disabled = true;
+  setAccessCodeStatus("Toegang wordt geactiveerd...");
+  try {
+    await functionJson("claim-access-code", {
+      method: "POST",
+      body: { email, code }
+    });
+    if (authEmail) authEmail.value = email;
+    const { error } = await authClient.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.href.split("#")[0]
+      }
+    });
+    if (error) throw error;
+    setAccessCodeStatus("Toegang geactiveerd. Check je e-mail en open de loginlink op dit apparaat.");
+    setAuthStatus("Check je e-mail. Klik op de link om de app te openen.");
+  } catch (error) {
+    setAccessCodeStatus(error.message || "De klascode kon niet geactiveerd worden.", true);
+    console.warn("access code activation failed", error);
+  } finally {
+    accessCodeSubmit.disabled = false;
+  }
+});
+
+accessCodeAdminForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!state.isAdmin) return;
+  const payload = {
+    label: accessCodeLabel?.value || "",
+    code: normalizeAccessCodeUi(accessCodeAdminCode?.value || ""),
+    maxUses: accessCodeMaxUses?.value || "",
+    expiresAt: accessCodeExpiresAt?.value || ""
+  };
+  setAccessCodeAdminStatus("Toegangscode wordt gemaakt...");
+  try {
+    await functionJson("admin-access-codes", {
+      method: "POST",
+      auth: true,
+      body: payload
+    });
+    accessCodeAdminForm.reset();
+    state.accessCodesLoaded = false;
+    setAccessCodeAdminStatus("Toegangscode aangemaakt.");
+    await loadAccessCodesAdmin({ force: true });
+  } catch (error) {
+    setAccessCodeAdminStatus(error.message || "Toegangscode kon niet worden aangemaakt.", true);
+    console.warn("access code create failed", error);
   }
 });
 
