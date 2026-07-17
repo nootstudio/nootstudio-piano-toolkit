@@ -515,6 +515,7 @@ const appShell = document.querySelector(".app-shell");
 const appTitle = document.querySelector("#appTitle");
 const pianoTitle = document.querySelector("#pianoTitle");
 const keyboardPanel = document.querySelector(".keyboard-panel");
+const currentChordPanel = document.querySelector(".current-chord");
 const degreeChords = document.querySelector("#degreeChords");
 const chordSequencePanel = document.querySelector("#chordSequencePanel");
 const chordSequenceList = document.querySelector("#chordSequenceList");
@@ -4364,7 +4365,7 @@ function scrollToMobileChordDetail() {
 }
 
 function scrollToChordInfoBlock() {
-  const target = mobileChordDetail || currentName || keyboardPanel;
+  const target = currentChordPanel || currentName || keyboardPanel;
   if (!target) return;
   requestAnimationFrame(() => {
     const top = target.getBoundingClientRect().top + window.scrollY - 10;
@@ -7085,8 +7086,7 @@ rootSelect.addEventListener("change", () => {
   state.chordActive = true;
   requestKeyboardFocus();
   render();
-  scrollToMobileChordDetail();
-  keepKeyboardPanelInViewOnTablet();
+  scrollToChordInfoBlock();
 });
 
 keySelect.addEventListener("change", () => {
@@ -7114,8 +7114,7 @@ qualitySelect.addEventListener("change", () => {
   state.chordActive = true;
   requestKeyboardFocus();
   render();
-  scrollToMobileChordDetail();
-  keepKeyboardPanelInViewOnTablet();
+  scrollToChordInfoBlock();
 });
 
 inversionSelect.addEventListener("change", () => {
@@ -7124,8 +7123,7 @@ inversionSelect.addEventListener("change", () => {
   state.chordActive = true;
   requestKeyboardFocus();
   render();
-  scrollToMobileChordDetail();
-  keepKeyboardPanelInViewOnTablet();
+  scrollToChordInfoBlock();
 });
 
 filterInput.addEventListener("input", renderGrid);
