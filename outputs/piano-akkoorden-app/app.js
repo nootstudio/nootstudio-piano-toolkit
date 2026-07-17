@@ -567,6 +567,9 @@ const inspirationFavoriteFilter = document.querySelector("#inspirationFavoriteFi
 const librarySyncButton = document.querySelector("#librarySyncButton");
 const deleteSelectedSongButton = document.querySelector("#deleteSelectedSongButton");
 const adminOnlyElements = document.querySelectorAll("[data-admin-only]");
+const songLibraryStats = document.querySelector("#songLibraryStats");
+const songLibraryTotalCount = document.querySelector("#songLibraryTotalCount");
+const songLibraryStatsGrid = document.querySelector("#songLibraryStatsGrid");
 const addSongForm = document.querySelector("#addSongForm");
 const addSongTitle = document.querySelector("#addSongTitle");
 const addSongArtist = document.querySelector("#addSongArtist");
@@ -2308,6 +2311,7 @@ function updateAdminUi() {
   }
   if (!isAdmin) state.schemaEditMode = false;
   renderSongSchemaEditor();
+  renderSongLibraryStats();
 }
 
 async function claimCurrentUserEntitlements() {
@@ -2996,15 +3000,20 @@ function syncAddSongKeyToCurrentScale() {
 }
 
 function renderSongInspirations() {
+  renderSongLibraryStats();
   const searchingAllKeys = Boolean(inspirationState.query.trim());
+  const showingFavorites = Boolean(inspirationState.favoritesOnly);
+  const showingCrossKeyList = searchingAllKeys || showingFavorites;
   const currentLabel = currentSongLibraryLabel();
-  const sourceSuggestions = searchingAllKeys
+  const sourceSuggestions = showingCrossKeyList
     ? allSongSearchCandidates()
     : suggestionsForCurrentScale().map((song) => ({ song, label: currentLabel }));
   const suggestions = filteredSortedSuggestions(sourceSuggestions);
   const group = inspirationGroupForScale(state.scale);
   const keyText = `${state.key.label} ${group === "minor" ? "mineur" : state.scale.name}`;
-  inspirationKeyLabel.innerHTML = searchingAllKeys
+  inspirationKeyLabel.innerHTML = showingFavorites
+    ? "Alle favoriete liedjes"
+    : searchingAllKeys
     ? `Zoeken in alle toonsoorten`
     : `${formatMusicText(keyText)} - oefen met deze toonladder`;
   inspirationList.innerHTML = "";
@@ -3021,6 +3030,7 @@ function renderSongInspirations() {
     const userSong = isUserSong(song, label);
     const favorite = isFavoriteSong(song);
     const chordPreview = inspirationChordPreview(song);
+    const keyBadge = showingFavorites ? `<i class="inspiration-key-badge">${formatMusicText(label)}</i>` : "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "inspiration-card";
@@ -3033,7 +3043,7 @@ function renderSongInspirations() {
       <span class="inspiration-info">
         <strong>${song.title}</strong>
         <span>${song.artist}</span>
-        <small><em>${song.style}</em><b>${song.year}</b>${song.level ? `<i>${song.level}</i>` : ""}${searchingAllKeys ? `<i>${formatMusicText(label)}</i>` : ""}${!songHasChordData(song) ? `<u>MusicXML later</u>` : ""}</small>
+        <small><em>${song.style}</em><b>${song.year}</b>${song.level ? `<i>${song.level}</i>` : ""}${keyBadge}${searchingAllKeys && !showingFavorites ? `<i>${formatMusicText(label)}</i>` : ""}${!songHasChordData(song) ? `<u>MusicXML later</u>` : ""}</small>
         ${chordPreview ? `<span class="inspiration-chords">${chordPreview}</span>` : ""}
       </span>
       <span class="inspiration-favorite" aria-label="Favoriet" title="Favoriet">${favorite ? "★" : "☆"}</span>
@@ -3255,6 +3265,55 @@ function allSongSearchCandidates() {
         });
     })
   ));
+}
+
+function keyLibrarySortIndex(group, keyLabel) {
+  const keyIndex = keyOptions.findIndex((key) => key.label === keyLabel);
+  const normalizedKeyIndex = keyIndex === -1 ? keyOptions.length : keyIndex;
+  return (group === "minor" ? 100 : 0) + normalizedKeyIndex;
+}
+
+function renderSongLibraryStats() {
+  if (!songLibraryStats || !songLibraryStatsGrid || !songLibraryTotalCount) return;
+  if (!state.isAdmin) return;
+  const candidates = allSongSearchCandidates();
+  const totalsByLabel = new Map();
+  const uniqueSongs = new Set();
+  candidates.forEach(({ song, label, group, keyLabel }) => {
+    const id = songIdentifier(song);
+    if (!id) return;
+    uniqueSongs.add(id);
+    const existing = totalsByLabel.get(label) || {
+      label,
+      group,
+      keyLabel,
+      count: 0
+    };
+    existing.count += 1;
+    totalsByLabel.set(label, existing);
+  });
+  keyOptions.forEach((key) => {
+    const label = `${key.label} majeur`;
+    if (!totalsByLabel.has(label)) {
+      totalsByLabel.set(label, {
+        label,
+        group: "major",
+        keyLabel: key.label,
+        count: 0
+      });
+    }
+  });
+  const rows = [...totalsByLabel.values()].sort((left, right) => (
+    keyLibrarySortIndex(left.group, left.keyLabel) - keyLibrarySortIndex(right.group, right.keyLabel)
+    || left.label.localeCompare(right.label, "nl")
+  ));
+  songLibraryTotalCount.textContent = String(uniqueSongs.size);
+  songLibraryStatsGrid.innerHTML = rows.map((row) => `
+    <div class="song-library-stat-card${row.count ? "" : " is-empty"}">
+      <span class="song-library-stat-label">${formatMusicText(row.label)}</span>
+      <strong class="song-library-stat-count">${row.count}</strong>
+    </div>
+  `).join("");
 }
 
 function songWithLibraryKey(song, label) {
@@ -7389,8 +7448,238 @@ function openCustomPrintView() {
   window.print();
 }
 
+const pdfPageWidth = 595.28;
+const pdfPageHeight = 841.89;
+const pdfMargin = 42;
+const pdfGold = [0.835, 0.647, 0.114];
+const pdfDark = [0.12, 0.13, 0.15];
+const pdfMuted = [0.43, 0.46, 0.5];
+const pdfLineColor = [0.82, 0.82, 0.78];
+
+function plainMusicText(value) {
+  const container = document.createElement("span");
+  container.innerHTML = formatMusicText(value);
+  return container.textContent || "";
+}
+
+function pdfEscape(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/[^\x20-\x7E]/g, "");
+}
+
+function pdfColor(color) {
+  return color.map((part) => Number(part).toFixed(3)).join(" ");
+}
+
+function pdfText(stream, text, x, yTop, size = 12, font = "F1", color = pdfDark) {
+  const y = pdfPageHeight - yTop;
+  stream.push(`BT /${font} ${size} Tf ${pdfColor(color)} rg ${x.toFixed(2)} ${y.toFixed(2)} Td (${pdfEscape(text)}) Tj ET`);
+}
+
+function pdfCenteredText(stream, text, x, yTop, width, size = 12, font = "F1", color = pdfDark) {
+  const estimatedWidth = String(text ?? "").length * size * 0.5;
+  pdfText(stream, text, x + Math.max(0, (width - estimatedWidth) / 2), yTop, size, font, color);
+}
+
+function pdfRect(stream, x, yTop, width, height, options = {}) {
+  const y = pdfPageHeight - yTop - height;
+  if (options.fill) stream.push(`${pdfColor(options.fill)} rg`);
+  if (options.stroke) stream.push(`${pdfColor(options.stroke)} RG`);
+  if (options.lineWidth) stream.push(`${options.lineWidth.toFixed(2)} w`);
+  stream.push(`${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re ${options.fill && options.stroke ? "B" : options.fill ? "f" : "S"}`);
+}
+
+function pdfLine(stream, x1, y1Top, x2, y2Top, width = 1, color = pdfLineColor) {
+  const y1 = pdfPageHeight - y1Top;
+  const y2 = pdfPageHeight - y2Top;
+  stream.push(`${pdfColor(color)} RG ${width.toFixed(2)} w ${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+}
+
+function buildPdfDocument(pageStreams) {
+  const encoder = new TextEncoder();
+  const pageCount = Math.max(1, pageStreams.length);
+  const fontRegularId = 3 + pageCount * 2;
+  const fontBoldId = fontRegularId + 1;
+  const objects = [];
+  objects[0] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[1] = `<< /Type /Pages /Kids [${Array.from({ length: pageCount }, (_, index) => `${3 + index * 2} 0 R`).join(" ")}] /Count ${pageCount} >>`;
+  pageStreams.forEach((stream, index) => {
+    const pageId = 3 + index * 2;
+    const contentId = pageId + 1;
+    const content = stream.join("\n");
+    objects[pageId - 1] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfPageWidth} ${pdfPageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`;
+    objects[contentId - 1] = `<< /Length ${encoder.encode(content).length} >>\nstream\n${content}\nendstream`;
+  });
+  objects[fontRegularId - 1] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
+  objects[fontBoldId - 1] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(encoder.encode(pdf).length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = encoder.encode(pdf).length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function pdfKeyboardRange(notes) {
+  const absolutes = notes.map((note) => note.absolute);
+  const lowest = Math.min(...absolutes);
+  const highest = Math.max(...absolutes);
+  let firstWhite = Math.floor((lowest - 2) / 12) * 12;
+  let lastWhite = Math.floor((highest + 2) / 12) * 12 + 11;
+  while (!whitePattern.includes(mod(lastWhite, 12))) lastWhite -= 1;
+  while (lastWhite - firstWhite < 12) {
+    firstWhite -= 12;
+    if (lastWhite - firstWhite >= 12) break;
+    lastWhite += 12;
+  }
+  const whiteNotes = [];
+  for (let absolute = firstWhite; absolute <= lastWhite; absolute += 1) {
+    if (whitePattern.includes(mod(absolute, 12))) whiteNotes.push({ absolute, pitch: mod(absolute, 12) });
+  }
+  return whiteNotes;
+}
+
+function drawPdfKeyboard(stream, notes, x, yTop, width, height) {
+  if (!notes.length) return;
+  const active = new Map(notes.map((note) => [note.absolute, note.label]));
+  const whiteNotes = pdfKeyboardRange(notes);
+  const whiteWidth = width / whiteNotes.length;
+  const blackWidth = whiteWidth * 0.58;
+  const blackHeight = height * 0.58;
+  whiteNotes.forEach((note, index) => {
+    const isActive = active.has(note.absolute);
+    pdfRect(stream, x + index * whiteWidth, yTop, whiteWidth, height, {
+      fill: isActive ? pdfGold : [0.985, 0.985, 0.97],
+      stroke: [0.72, 0.72, 0.7],
+      lineWidth: 0.55
+    });
+    if (isActive) {
+      pdfCenteredText(stream, active.get(note.absolute), x + index * whiteWidth, yTop + height - 9, whiteWidth, 7.5, "F2", pdfDark);
+    }
+  });
+  whiteNotes.forEach((note, index) => {
+    const next = whiteNotes[index + 1];
+    if (!next || next.absolute - note.absolute !== 2) return;
+    const blackAbsolute = note.absolute + 1;
+    const isActive = active.has(blackAbsolute);
+    const blackX = x + (index + 1) * whiteWidth - blackWidth / 2;
+    pdfRect(stream, blackX, yTop, blackWidth, blackHeight, {
+      fill: isActive ? [0.22, 0.22, 0.22] : [0.16, 0.17, 0.19],
+      stroke: [0.08, 0.08, 0.09],
+      lineWidth: 0.45
+    });
+    if (isActive) {
+      pdfCenteredText(stream, active.get(blackAbsolute), blackX, yTop + blackHeight - 8, blackWidth, 6.4, "F2", [1, 1, 1]);
+    }
+  });
+}
+
+function drawCustomPdfScale(stream, yTop) {
+  const title = `${plainMusicText(customState.key.label)} ${customState.scale.name} toonladder`;
+  const notes = scaleNotes(customState.key, customState.scale);
+  pdfText(stream, title, pdfMargin, yTop, 14, "F2", pdfDark);
+  drawPdfKeyboard(stream, notes, pdfMargin, yTop + 14, pdfPageWidth - pdfMargin * 2, 66);
+}
+
+function drawCustomPdfChord(stream, chord, index, x, yTop, width, height) {
+  const notes = chord.voicingNotes || chord.notes || [];
+  pdfRect(stream, x, yTop, width, height, {
+    fill: [1, 1, 1],
+    stroke: [0.82, 0.82, 0.8],
+    lineWidth: 0.75
+  });
+  pdfText(stream, `${index + 1}. ${plainMusicText(chord.symbol)}`, x + 10, yTop + 18, 16, "F2", pdfDark);
+  pdfText(stream, plainMusicText(formatNoteList(notes)), x + 10, yTop + 37, 9.5, "F1", pdfMuted);
+  pdfText(stream, plainMusicText(voicingLabel(chord.inversion)), x + 10, yTop + 52, 9.5, "F1", pdfMuted);
+  drawPdfKeyboard(stream, notes, x + 10, yTop + 64, width - 20, height - 76);
+}
+
+function customPdfFilename() {
+  const base = `${customState.title || "akkoordenreeks"} ${customState.artist || ""}`.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${base || "nootstudio-akkoordenreeks"}.pdf`;
+}
+
+function downloadPdfBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.target = "_blank";
+  link.rel = "noopener";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+function createCustomPdf() {
+  rebuildCustomChords();
+  const pageStreams = [[]];
+  let stream = pageStreams[0];
+  let y = 46;
+  const cardGap = 12;
+  const columns = 3;
+  const cardWidth = (pdfPageWidth - pdfMargin * 2 - cardGap * (columns - 1)) / columns;
+  const cardHeight = 136;
+
+  const newPage = () => {
+    stream = [];
+    pageStreams.push(stream);
+    y = 46;
+  };
+  const ensureSpace = (height) => {
+    if (y + height <= pdfPageHeight - 40) return;
+    newPage();
+  };
+
+  pdfCenteredText(stream, customState.title || "Akkoordenreeks", pdfMargin, y, pdfPageWidth - pdfMargin * 2, 22, "F2", pdfDark);
+  y += 24;
+  if (customState.artist) {
+    pdfCenteredText(stream, customState.artist, pdfMargin, y, pdfPageWidth - pdfMargin * 2, 13, "F1", pdfMuted);
+    y += 24;
+  } else {
+    y += 8;
+  }
+  drawCustomPdfScale(stream, y);
+  y += 98;
+
+  if (!customState.chords.length) {
+    pdfRect(stream, pdfMargin, y, pdfPageWidth - pdfMargin * 2, 54, {
+      fill: [0.98, 0.97, 0.93],
+      stroke: [0.86, 0.78, 0.55],
+      lineWidth: 0.7
+    });
+    pdfCenteredText(stream, "Voeg eerst akkoorden toe voordat je een PDF maakt.", pdfMargin, y + 32, pdfPageWidth - pdfMargin * 2, 12, "F1", pdfMuted);
+  } else {
+    customState.chords.forEach((chord, index) => {
+      if (index % columns === 0) ensureSpace(cardHeight + 18);
+      const column = index % columns;
+      const x = pdfMargin + column * (cardWidth + cardGap);
+      drawCustomPdfChord(stream, chord, index, x, y, cardWidth, cardHeight);
+      if (column === columns - 1) y += cardHeight + 14;
+    });
+  }
+
+  const blob = buildPdfDocument(pageStreams);
+  downloadPdfBlob(blob, customPdfFilename());
+}
+
 customPrintButton?.addEventListener("click", openCustomPrintView);
-customPdfButton?.addEventListener("click", openCustomPrintView);
+customPdfButton?.addEventListener("click", createCustomPdf);
 
 pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {

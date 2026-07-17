@@ -227,6 +227,19 @@
             <button class="inspiration-favorite-filter" id="inspirationFavoriteFilter" type="button">Favorieten</button>
           </div>
           <div class="inspiration-list" id="inspirationList"></div>
+          <section class="song-library-stats" id="songLibraryStats" data-admin-only hidden aria-label="Liedjesteller">
+            <div class="song-library-stats-header">
+              <div>
+                <h3>Liedjesteller</h3>
+                <p>Overzicht per toonsoort</p>
+              </div>
+              <div class="song-library-total">
+                <span id="songLibraryTotalCount">0</span>
+                <small>liedjes totaal</small>
+              </div>
+            </div>
+            <div class="song-library-stats-grid" id="songLibraryStatsGrid"></div>
+          </section>
           <details class="song-add-panel" data-admin-only hidden>
             <summary>Liedje toevoegen</summary>
             <form class="song-add-form" id="addSongForm">
@@ -500,7 +513,8 @@
             <div class="custom-step custom-step-print">
               <div class="custom-step-number" aria-hidden="true">3</div>
               <div class="custom-step-content custom-print-step-content">
-                <button class="custom-print-button" id="customPrintButton" type="button">Print</button>
+                <button class="custom-print-button" id="customPrintButton" type="button">PRINT</button>
+                <span class="custom-print-or">of</span>
                 <button class="custom-pdf-button" id="customPdfButton" type="button">PDF</button>
               </div>
             </div>
