@@ -1,0 +1,204 @@
+.ns-song-request-panel,
+.ns-song-request-admin {
+  --ns-gold: #d5a51d;
+  --ns-green: #1caf8e;
+  --ns-purple: #951b81;
+  --ns-ink: #202126;
+  --ns-muted: #73777f;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(213, 165, 29, 0.34);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(32, 33, 38, 0.08);
+  margin: 24px 0;
+  padding: 22px;
+}
+
+.ns-song-request-panel h2,
+.ns-song-request-admin h2 {
+  color: var(--ns-ink);
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  line-height: 1.05;
+  margin: 0;
+}
+
+.ns-song-request-panel p,
+.ns-song-request-admin p {
+  color: var(--ns-muted);
+  margin: 6px 0 0;
+}
+
+.ns-song-request-form {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  margin-top: 18px;
+}
+
+.ns-song-request-form label {
+  color: var(--ns-muted);
+  display: grid;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.ns-song-request-form label:nth-child(5) {
+  grid-column: 1 / -1;
+}
+
+.ns-song-request-form input,
+.ns-song-request-form textarea,
+.ns-song-request-admin select {
+  background: #fff;
+  border: 1px solid rgba(32, 33, 38, 0.16);
+  border-radius: 8px;
+  color: var(--ns-ink);
+  font: inherit;
+  min-height: 42px;
+  padding: 10px 12px;
+}
+
+.ns-song-request-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.ns-song-request-actions,
+.ns-song-request-admin-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.ns-song-request-button {
+  background: var(--ns-gold);
+  border: 0;
+  border-radius: 999px;
+  color: var(--ns-ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 12px 18px;
+}
+
+.ns-song-request-button.secondary {
+  background: #f0efea;
+  color: var(--ns-muted);
+}
+
+.ns-song-request-message {
+  color: var(--ns-purple);
+  font-weight: 800;
+  min-height: 1.4em;
+}
+
+.ns-song-request-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.ns-song-request-card {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(32, 33, 38, 0.12);
+  border-radius: 10px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+}
+
+.ns-song-request-card strong {
+  color: var(--ns-purple);
+  font-size: 1.15rem;
+}
+
+.ns-song-request-meta {
+  color: var(--ns-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.ns-song-request-status {
+  align-items: center;
+  background: rgba(28, 175, 142, 0.14);
+  border-radius: 999px;
+  color: #116f5c;
+  display: inline-flex;
+  font-weight: 800;
+  padding: 4px 10px;
+  width: fit-content;
+}
+
+.ns-song-request-status[data-status="in_behandeling"] {
+  background: rgba(213, 165, 29, 0.18);
+  color: #806000;
+}
+
+.ns-song-request-status[data-status="toegevoegd"] {
+  background: rgba(28, 175, 142, 0.18);
+  color: #116f5c;
+}
+
+.ns-song-request-status[data-status="afgewezen"] {
+  background: rgba(149, 27, 129, 0.12);
+  color: var(--ns-purple);
+}
+
+.ns-song-request-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ns-song-request-stat {
+  background: rgba(213, 165, 29, 0.13);
+  border: 1px solid rgba(213, 165, 29, 0.28);
+  border-radius: 999px;
+  color: var(--ns-ink);
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.ns-song-request-admin-row {
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr auto auto;
+}
+
+.ns-song-request-delete {
+  background: #f0efea;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ns-muted);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  height: 38px;
+  width: 38px;
+}
+
+@media (max-width: 720px) {
+  .ns-song-request-panel,
+  .ns-song-request-admin {
+    margin: 18px 0;
+    padding: 16px;
+  }
+
+  .ns-song-request-form,
+  .ns-song-request-admin-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ns-song-request-form label:nth-child(5) {
+    grid-column: auto;
+  }
+
+  .ns-song-request-admin-row select,
+  .ns-song-request-delete {
+    width: fit-content;
+  }
+}

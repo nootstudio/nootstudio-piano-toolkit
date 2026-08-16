@@ -1,0 +1,30 @@
+/* Keep account actions near the main navigation on larger screens. */
+.desktop-top-logout {
+  display: none;
+  width: auto;
+  min-width: max-content;
+  margin-left: auto;
+  padding: 0.7rem 1rem;
+  border: 1px solid #d7d5cf;
+  border-radius: 6px;
+  background: #f4f2ec;
+  color: #646973;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+@media (min-width: 901px) {
+  .desktop-top-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 900px) {
+  .desktop-top-logout {
+    display: none !important;
+  }
+}

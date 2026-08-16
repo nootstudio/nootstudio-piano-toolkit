@@ -4,8 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Piano Akkoorden</title>
-  <link rel="stylesheet" href="styles.css?v=20260715-logo-video-2">
-  </head>
+  <script>
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      const startPageAtTop = () => window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      startPageAtTop();
+      document.addEventListener("DOMContentLoaded", () => requestAnimationFrame(startPageAtTop), { once: true });
+      window.addEventListener("pageshow", () => requestAnimationFrame(startPageAtTop));
+      window.addEventListener("load", () => window.setTimeout(startPageAtTop, 0), { once: true });
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css?v=20260817-measure-edge-spacing-1">
+  <link rel="stylesheet" href="./song-requests.css">
+  <link rel="stylesheet" href="./mobile-fixes.css?v=20260817-video-onetap-1">
+  <link rel="stylesheet" href="mobile-notation-fix.css?v=20260816-sequence-spacing-1">
+  <link rel="stylesheet" href="desktop-logout.css">
+  <link rel="stylesheet" href="desktop-nav-logout-v2.css">
+</head>
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-live="polite">
       <div class="auth-card">
@@ -237,6 +252,7 @@
               </select>
             </label>
             <button class="inspiration-favorite-filter" id="inspirationFavoriteFilter" type="button">Favorieten</button>
+            <button class="inspiration-group-toggle active" id="inspirationGroupToggle" type="button" aria-pressed="true">Per artiest ✓</button>
           </div>
           <div class="inspiration-list" id="inspirationList"></div>
           <section class="song-library-stats" id="songLibraryStats" data-admin-only hidden aria-label="Liedjesteller">
@@ -303,7 +319,6 @@
               </div>
               <div class="song-add-actions">
                 <button type="submit">Voeg liedje toe</button>
-                <button class="library-sync-button" id="librarySyncButton" type="button" data-admin-only hidden>Sync online</button>
                 <button class="song-delete-selected-button" id="deleteSelectedSongButton" type="button" data-admin-only hidden>Verwijder geselecteerd</button>
               </div>
               <p id="addSongStatus" aria-live="polite"></p>
@@ -562,6 +577,10 @@
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260715-logo-local-1"></script>
-  </body>
+    <script src="app.js?v=20260817-group-by-artist-1"></script>
+  <script src="./song-requests.js"></script>
+  <script src="./mobile-fixes.js?v=20260817-video-onetap-1"></script>
+  <script src="desktop-logout.js"></script>
+  <script src="desktop-nav-logout-v2.js"></script>
+</body>
 </html>

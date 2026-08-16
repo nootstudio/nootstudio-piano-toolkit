@@ -1,0 +1,24 @@
+/* Desktop-only account action beside the primary navigation. */
+.desktop-nav-logout-v2 {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  .desktop-nav-logout-v2 {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: max-content;
+    margin-left: auto;
+    padding: 0.7rem 1rem;
+    border: 1px solid #d7d5cf;
+    border-radius: 6px;
+    background: #f4f2ec;
+    color: #646973;
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+}

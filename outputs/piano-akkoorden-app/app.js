@@ -173,7 +173,8 @@ const inspirationState = {
   offset: 0,
   query: "",
   sort: "title",
-  favoritesOnly: false
+  favoritesOnly: false,
+  groupMode: "artist"
 };
 
 const customState = {
@@ -567,7 +568,7 @@ const studentCodeStatus = document.querySelector("#studentCodeStatus");
 const inspirationSearch = document.querySelector("#inspirationSearch");
 const inspirationSort = document.querySelector("#inspirationSort");
 const inspirationFavoriteFilter = document.querySelector("#inspirationFavoriteFilter");
-const librarySyncButton = document.querySelector("#librarySyncButton");
+const inspirationGroupToggle = document.querySelector("#inspirationGroupToggle");
 const deleteSelectedSongButton = document.querySelector("#deleteSelectedSongButton");
 const adminOnlyElements = document.querySelectorAll("[data-admin-only]");
 const songLibraryStats = document.querySelector("#songLibraryStats");
@@ -1811,7 +1812,8 @@ function staffYForNote(note) {
 }
 
 function frequencyFromMidi(midi) {
-  return 440 * (2 ** ((midi - 69) / 12));
+  const synthMidi = midi - 12;
+  return 440 * (2 ** ((synthMidi - 69) / 12));
 }
 
 function getAudioContext() {
@@ -2732,44 +2734,6 @@ async function deleteRemoteSong(label, song) {
   });
 }
 
-async function syncLocalSongsOnline() {
-  if (!state.isAdmin) {
-    if (inspirationStatus) inspirationStatus.textContent = "Alleen beheerders kunnen synchroniseren.";
-    return;
-  }
-  if (!remoteLibraryEnabled()) {
-    if (inspirationStatus) inspirationStatus.textContent = "Online synchronisatie is nog niet ingesteld in app-config.js.";
-    return;
-  }
-  const localLibrary = userSongsFromStorage();
-  const items = Object.entries(localLibrary)
-    .flatMap(([label, songs]) => (Array.isArray(songs) ? songs : []).map((song) => ({ label, song: normalizeSongJsonEntry(song) })))
-    .filter((item) => item.song);
-  if (!items.length) {
-    if (inspirationStatus) inspirationStatus.textContent = "Er staan geen lokale liedjes klaar om online te synchroniseren.";
-    return;
-  }
-  if (librarySyncButton) librarySyncButton.disabled = true;
-  if (inspirationStatus) inspirationStatus.textContent = `${items.length} lokale liedjes worden online gezet...`;
-  let saved = 0;
-  let failed = 0;
-  for (const item of items) {
-    try {
-      await saveRemoteSong(item.label, item.song);
-      saved += 1;
-    } catch {
-      failed += 1;
-    }
-  }
-  await loadRemoteSongLibrary();
-  if (librarySyncButton) librarySyncButton.disabled = false;
-  if (inspirationStatus) {
-    inspirationStatus.textContent = failed
-      ? `${saved} liedjes online gezet, ${failed} niet gelukt.`
-      : `${saved} lokale liedjes zijn online gezet. Open de site opnieuw op mobiel.`;
-  }
-}
-
 function mergeSongList(existing = [], incoming = []) {
   const merged = [...existing];
   incoming.forEach((song) => {
@@ -2998,10 +2962,12 @@ function filteredSortedSuggestions(suggestions) {
   });
 }
 
-function groupedSuggestions(suggestions) {
+function groupedSuggestions(suggestions, mode = "style") {
   return suggestions.reduce((groups, item) => {
     const song = songFromSuggestionItem(item);
-    const label = song.style || "Overig";
+    const label = mode === "artist"
+      ? song.artist || "Onbekende artiest"
+      : song.style || "Overig";
     groups[label] ||= [];
     groups[label].push(item);
     return groups;
@@ -3221,6 +3187,12 @@ function renderSongInspirations() {
   inspirationList.innerHTML = "";
   if (inspirationStatus) inspirationStatus.textContent = "";
   inspirationFavoriteFilter?.classList.toggle("active", inspirationState.favoritesOnly);
+  if (inspirationGroupToggle) {
+    const groupedByArtist = inspirationState.groupMode === "artist";
+    inspirationGroupToggle.classList.toggle("active", groupedByArtist);
+    inspirationGroupToggle.setAttribute("aria-pressed", String(groupedByArtist));
+    inspirationGroupToggle.textContent = groupedByArtist ? "Per artiest ✓" : "Per artiest";
+  }
   if (!suggestions.length) {
     inspirationList.innerHTML = `<p class="inspiration-empty">Geen liedjes gevonden.</p>`;
     inspirationRefreshButton.hidden = true;
@@ -3262,11 +3234,20 @@ function renderSongInspirations() {
     });
     target.append(card);
   };
-  Object.entries(groupedSuggestions(suggestions)).forEach(([style, songs]) => {
+  const groupedByArtist = inspirationState.groupMode === "artist";
+  const suggestionGroups = Object.entries(groupedSuggestions(suggestions, groupedByArtist ? "artist" : "style"));
+  if (groupedByArtist) {
+    suggestionGroups.sort(([left], [right]) => left.localeCompare(right, "nl", { sensitivity: "base" }));
+  }
+  suggestionGroups.forEach(([groupLabel, songs]) => {
     const section = document.createElement("section");
     section.className = "inspiration-group";
+    section.classList.toggle("grouped-by-artist", groupedByArtist);
     section.innerHTML = `
-      <h3>${escapeHtml(style)}</h3>
+      <h3>
+        <span>${escapeHtml(groupLabel)}</span>
+        ${groupedByArtist ? `<small>${songs.length} ${songs.length === 1 ? "liedje" : "liedjes"}</small>` : ""}
+      </h3>
       <div class="inspiration-group-list"></div>
     `;
     const list = section.querySelector(".inspiration-group-list");
@@ -3373,7 +3354,10 @@ function schemaChordRowHtml(sectionIndex, measureIndex, originalIndex, entry = "
         <span>Tellen</span>
         <input class="schema-chord-beats" type="number" min="0.25" step="0.25" value="${escapeAttribute(timing.beats)}" aria-label="Aantal tellen">
       </label>
-      <button type="button" class="schema-remove-chord" data-schema-action="remove-chord" aria-label="Verwijder akkoord">×</button>
+      <div class="schema-row-actions">
+        <button type="button" class="schema-insert-chord" data-schema-action="insert-chord" aria-label="Voeg akkoord hieronder in" title="Voeg akkoord hieronder in">+</button>
+        <button type="button" class="schema-remove-chord" data-schema-action="remove-chord" aria-label="Verwijder akkoord">×</button>
+      </div>
     </div>`;
 }
 
@@ -3988,6 +3972,16 @@ function navigationMarkerHtml(navItems = []) {
     .join("");
 }
 
+function measureHasEndingNumber(measure, number) {
+  const endingNumbers = String(measure?.ending || "").match(/\d+/g) || [];
+  return endingNumbers.includes(String(number));
+}
+
+function measuresHaveFirstAndSecondEndings(measures = []) {
+  return measures.some((measure) => measureHasEndingNumber(measure, 1))
+    && measures.some((measure) => measureHasEndingNumber(measure, 2));
+}
+
 function renderSelectedInspirationSong() {
   const song = state.selectedInspirationSong;
   if (!selectedSongChords || !selectedSongChordList) return;
@@ -4100,6 +4094,7 @@ function renderSelectedInspirationSong() {
     let activeMeter = "";
     let songMeterShown = false;
     sections.forEach((section) => {
+      const sectionHasFirstAndSecondEndings = measuresHaveFirstAndSecondEndings(section.measures);
       if (section.key && section.key !== activeKeyLabel) {
         selectedSongChordList.append(renderModulationMarker(section.key));
         activeKeyLabel = section.key;
@@ -4176,8 +4171,8 @@ function renderSelectedInspirationSong() {
           measureEl.append(nav);
         }
         measureEntriesFromMeasure(measure).forEach((token) => renderChordButton(token, measureEl, measureKeyLabel));
-        if (measure.repeatEnd && measure.repeatCount > 1) {
-          measureEl.classList.add("has-repeat-badge");
+        const repeatCountIsShownByEndings = sectionHasFirstAndSecondEndings && measureHasEndingNumber(measure, 1);
+        if (measure.repeatEnd && measure.repeatCount > 1 && !repeatCountIsShownByEndings) {
           const repeatBadge = document.createElement("span");
           repeatBadge.className = "selected-repeat-badge";
           repeatBadge.textContent = `x${measure.repeatCount}`;
@@ -4220,7 +4215,7 @@ function renderSongSchemaEditor() {
         <article class="schema-measure-card" data-section-index="${sectionIndex}" data-measure-index="${measureIndex}">
           <div class="schema-measure-head">
             <strong>Maat ${escapeHtml(measureNumberText(measure, measureIndex))}</strong>
-            <button type="button" class="schema-add-chord" data-schema-action="add-chord">+ akkoord</button>
+            <button type="button" class="schema-add-chord" data-schema-action="prepend-chord">+ vooraan</button>
           </div>
           <div class="schema-chord-rows">${rows || '<span class="schema-empty-measure">Geen akkoord</span>'}</div>
         </article>`;
@@ -4269,6 +4264,25 @@ function handleSongSchemaEditorClick(event) {
     if (rows && !rows.querySelector(".schema-chord-row")) {
       rows.innerHTML = '<span class="schema-empty-measure">Geen akkoord</span>';
     }
+    return;
+  }
+  if (action === "insert-chord") {
+    const row = button.closest(".schema-chord-row");
+    if (!row) return;
+    row.insertAdjacentHTML(
+      "afterend",
+      schemaChordRowHtml(row.dataset.sectionIndex, row.dataset.measureIndex, -1, "")
+    );
+    row.nextElementSibling?.querySelector(".schema-chord-token")?.focus();
+    return;
+  }
+  if (action === "prepend-chord") {
+    const card = button.closest(".schema-measure-card");
+    const rows = card?.querySelector(".schema-chord-rows");
+    if (!card || !rows) return;
+    rows.querySelector(".schema-empty-measure")?.remove();
+    rows.insertAdjacentHTML("afterbegin", schemaChordRowHtml(card.dataset.sectionIndex, card.dataset.measureIndex, -1, ""));
+    rows.querySelector(".schema-chord-row:first-child .schema-chord-token")?.focus();
     return;
   }
   if (action === "add-chord") {
@@ -4995,12 +5009,46 @@ function setupNootstudioScaleVideoPlayer(player) {
     player.classList.toggle("is-muted", video.muted);
     muteButton.setAttribute("aria-label", video.muted ? "Geluid aan" : "Geluid uit");
   });
+  const enterVideoFullscreen = () => {
+    const enterIosVideoFullscreen = () => {
+      if (typeof video.webkitEnterFullscreen !== "function") return false;
+      try {
+        video.webkitEnterFullscreen();
+        return true;
+      } catch (error) {
+        console.warn("Volledig scherm openen is niet gelukt", error);
+        return false;
+      }
+    };
+
+    if (!document.fullscreenEnabled && (video.webkitSupportsFullscreen || typeof video.webkitEnterFullscreen === "function")) {
+      enterIosVideoFullscreen();
+      return;
+    }
+
+    const requestFullscreen = player.requestFullscreen
+      || player.webkitRequestFullscreen
+      || player.msRequestFullscreen;
+    if (typeof requestFullscreen === "function") {
+      try {
+        const request = requestFullscreen.call(player);
+        request?.catch?.(() => enterIosVideoFullscreen());
+      } catch (error) {
+        if (!enterIosVideoFullscreen()) console.warn("Volledig scherm openen is niet gelukt", error);
+      }
+      return;
+    }
+
+    enterIosVideoFullscreen();
+  };
   fullscreenButton.addEventListener("click", () => {
     showControls();
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.();
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fullscreenElement) {
+      const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      exitFullscreen?.call(document);
     } else {
-      player.requestFullscreen?.();
+      enterVideoFullscreen();
     }
   });
   video.addEventListener("loadedmetadata", sync);
@@ -7199,10 +7247,9 @@ function renderSongCards(section, grid, startMeasure = 1, showMeter = false) {
     repeatWrap.className = "repeat-group";
     repeatWrap.classList.toggle("is-repeated", part.repeat > 1);
     repeatWrap.style.setProperty("--repeat-count", String(part.repeat));
-
-    let repeatBadge = null;
-    if (part.repeat > 1) {
-      repeatBadge = document.createElement("span");
+    const showRepeatBadge = part.repeat > 1 && !measuresHaveFirstAndSecondEndings(part.measures);
+    const repeatBadge = showRepeatBadge ? document.createElement("span") : null;
+    if (repeatBadge) {
       repeatBadge.className = "repeat-badge";
       repeatBadge.textContent = `x${part.repeat}`;
     }
@@ -7560,11 +7607,9 @@ inspirationFavoriteFilter?.addEventListener("click", () => {
   renderSongInspirations();
 });
 
-librarySyncButton?.addEventListener("click", () => {
-  syncLocalSongsOnline().catch(() => {
-    if (librarySyncButton) librarySyncButton.disabled = false;
-    if (inspirationStatus) inspirationStatus.textContent = "Online synchronisatie is niet gelukt.";
-  });
+inspirationGroupToggle?.addEventListener("click", () => {
+  inspirationState.groupMode = inspirationState.groupMode === "artist" ? "style" : "artist";
+  renderSongInspirations();
 });
 
 deleteSelectedSongButton?.addEventListener("click", deleteSelectedInspirationSong);
@@ -8025,6 +8070,12 @@ mobilePageMenuItems.forEach((item) => {
   });
 });
 
+mobilePageMenu?.addEventListener("click", (event) => {
+  if (!event.target.closest("button")) return;
+  mobilePageMenu.hidden = true;
+  mobilePageMenuButton?.setAttribute("aria-expanded", "false");
+});
+
 document.addEventListener("click", (event) => {
   if (!mobilePageMenu || mobilePageMenu.hidden) return;
   const target = event.target;
@@ -8155,3 +8206,763 @@ render();
 loadSongJsonLibrary();
 loadRemoteSongLibrary();
 refreshAuthAccess();
+/* Nootstudio ontwerp-pagina: liedje aanvragen + expliciete BW Glenn Slab basis */
+(function () {
+  const VIEW_ID = "ns-song-request-view";
+  const STYLE_ID = "ns-song-request-style";
+  const TAB_LABEL = "Liedje aanvragen";
+
+  function onReady(callback) {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", callback);
+      return;
+    }
+    callback();
+  }
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      :root {
+        --ns-font-slab: "BW Glenn Slab", "BW Glenn Slab Trial", "BW Glenn Slab Web", "Rockwell", "Georgia", serif;
+        --ns-gold: #d5a51d;
+        --ns-green: #1caf8e;
+        --ns-purple: #951b81;
+        --ns-ink: #202126;
+        --ns-muted: #70757f;
+        --ns-line: rgba(32, 33, 38, 0.14);
+        --ns-wash: rgba(213, 165, 29, 0.12);
+      }
+
+      body,
+      button,
+      input,
+      select,
+      textarea {
+        font-family: var(--ns-font-slab);
+      }
+
+      .ns-request-nav-button {
+        appearance: none;
+        border: 1px solid var(--ns-line);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.86);
+        color: var(--ns-muted);
+        cursor: pointer;
+        font: 800 1rem/1 var(--ns-font-slab);
+        padding: 0.78rem 1.05rem;
+        white-space: nowrap;
+        box-shadow: 0 10px 24px rgba(32, 33, 38, 0.08);
+        transition: transform 160ms ease, color 160ms ease, background 160ms ease, border-color 160ms ease;
+      }
+
+      .ns-request-nav-button:hover,
+      .ns-request-nav-button.is-active {
+        background: var(--ns-gold);
+        border-color: var(--ns-gold);
+        color: var(--ns-ink);
+        transform: translateY(-1px);
+      }
+
+      .ns-request-mobile-tab {
+        width: auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0.35rem;
+      }
+
+      .ns-song-request-page[hidden] {
+        display: none !important;
+      }
+
+      .ns-song-request-page {
+        position: fixed;
+        inset: 0;
+        z-index: 200;
+        display: grid;
+        place-items: center;
+        overflow-y: auto;
+        padding: clamp(1rem, 4vw, 2rem);
+        background: rgba(20, 21, 24, 0.56);
+        backdrop-filter: blur(3px);
+      }
+
+      .ns-song-request-dialog {
+        position: relative;
+        width: min(100%, 470px);
+        box-sizing: border-box;
+        padding: clamp(1.25rem, 4vw, 2rem);
+        border: 1px solid rgba(213, 165, 29, 0.38);
+        border-radius: 18px;
+        background:
+          radial-gradient(circle at 12% 8%, rgba(213, 165, 29, 0.22), transparent 34rem),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 236, 0.88));
+        box-shadow: 0 22px 55px rgba(32, 33, 38, 0.12);
+        color: var(--ns-ink);
+      }
+
+      body.ns-request-modal-open {
+        overflow: hidden;
+      }
+
+      .ns-song-request-hero {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.25rem;
+      }
+
+      .ns-song-request-kicker {
+        margin: 0 0 0.35rem;
+        color: var(--ns-gold);
+        font-size: 0.92rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .ns-song-request-title {
+        margin: 0;
+        color: var(--ns-purple);
+        font-size: clamp(1.8rem, 5vw, 2.5rem);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .ns-song-request-close {
+        flex: 0 0 auto;
+        width: 42px;
+        height: 42px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(32, 33, 38, 0.08);
+        color: var(--ns-ink);
+        cursor: pointer;
+        font: 400 1.8rem/1 var(--ns-font-slab);
+      }
+
+      .ns-song-request-close:hover,
+      .ns-song-request-close:focus-visible {
+        background: var(--ns-gold);
+        outline: none;
+      }
+
+      .ns-song-request-intro {
+        max-width: 760px;
+        margin: 0.85rem 0 0;
+        color: var(--ns-muted);
+        font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+        font-weight: 800;
+        line-height: 1.35;
+      }
+
+      .ns-song-request-pill {
+        align-self: start;
+        border-radius: 999px;
+        background: #202126;
+        color: var(--ns-gold);
+        font-weight: 900;
+        padding: 0.65rem 0.9rem;
+        white-space: nowrap;
+      }
+
+      .ns-song-request-form {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .ns-song-request-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.95rem;
+      }
+
+      .ns-song-request-field {
+        display: grid;
+        gap: 0.38rem;
+      }
+
+      .ns-song-request-field-wide {
+        grid-column: 1 / -1;
+      }
+
+      .ns-song-request-field label {
+        color: var(--ns-muted);
+        font-size: 1rem;
+        font-weight: 900;
+      }
+
+      .ns-song-request-field input,
+      .ns-song-request-field select,
+      .ns-song-request-field textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--ns-line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--ns-ink);
+        font-size: 1.15rem;
+        font-weight: 850;
+        padding: 0.9rem 1rem;
+        box-shadow: 0 12px 24px rgba(32, 33, 38, 0.05);
+      }
+
+      .ns-song-request-field textarea {
+        min-height: 8rem;
+        resize: vertical;
+        line-height: 1.35;
+      }
+
+      .ns-song-request-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.85rem;
+        padding-top: 0.35rem;
+      }
+
+      .ns-song-request-submit {
+        border: 0;
+        border-radius: 999px;
+        background: var(--ns-gold);
+        color: var(--ns-ink);
+        cursor: pointer;
+        font-size: 1.15rem;
+        font-weight: 950;
+        padding: 0.95rem 1.25rem;
+        box-shadow: 0 15px 28px rgba(213, 165, 29, 0.25);
+      }
+
+      .ns-song-request-note,
+      .ns-song-request-status {
+        margin: 0;
+        color: var(--ns-muted);
+        font-size: 0.98rem;
+        font-weight: 800;
+      }
+
+      .ns-song-request-status {
+        color: var(--ns-green);
+      }
+
+      @media (max-width: 760px) {
+        .ns-song-request-page {
+          padding: 0.75rem;
+        }
+
+        .ns-song-request-dialog {
+          border-radius: 14px;
+        }
+
+        .ns-song-request-hero {
+          align-items: center;
+        }
+
+        .ns-song-request-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .ns-request-nav-button {
+          font-size: 0.95rem;
+          padding: 0.72rem 0.9rem;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensurePage() {
+    let page = document.getElementById(VIEW_ID);
+    if (page) return page;
+
+    page = document.createElement("section");
+    page.id = VIEW_ID;
+    page.className = "ns-song-request-page";
+    page.hidden = true;
+    page.innerHTML = `
+      <div class="ns-song-request-dialog" role="dialog" aria-modal="true" aria-labelledby="ns-song-request-title">
+        <div class="ns-song-request-hero">
+          <h2 class="ns-song-request-title" id="ns-song-request-title">Liedje aanvragen</h2>
+          <button class="ns-song-request-close" type="button" aria-label="Venster sluiten" data-request-close>&times;</button>
+        </div>
+        <form class="ns-song-request-form">
+          <div class="ns-song-request-grid">
+            <div class="ns-song-request-field">
+              <label for="ns-request-title">Titel</label>
+              <input id="ns-request-title" name="title" type="text" placeholder="Bijv. Fix You" autocomplete="off" required>
+            </div>
+            <div class="ns-song-request-field">
+              <label for="ns-request-artist">Artiest</label>
+              <input id="ns-request-artist" name="artist" type="text" placeholder="Bijv. Coldplay" autocomplete="off">
+            </div>
+          </div>
+          <div class="ns-song-request-actions">
+            <button class="ns-song-request-submit" type="submit">Verstuur aanvraag</button>
+          </div>
+          <p class="ns-song-request-status" data-request-status aria-live="polite"></p>
+        </form>
+      </div>
+    `;
+
+    const host = document.querySelector("main") || document.getElementById("app") || document.body;
+    host.appendChild(page);
+
+    page.querySelector("form").addEventListener("submit", function (event) {
+      event.preventDefault();
+      page.querySelector("[data-request-status]").textContent =
+        "Ontwerpvoorbeeld: deze aanvraag is nog niet opgeslagen, maar zo kan de leerlingflow eruitzien.";
+    });
+
+    page.querySelector("[data-request-close]").addEventListener("click", hideRequestPage);
+    page.addEventListener("click", function (event) {
+      if (event.target === page) hideRequestPage();
+    });
+
+    return page;
+  }
+
+  function setRequestActive(active) {
+    document.querySelectorAll("[data-ns-request-tab]").forEach(function (button) {
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-current", active ? "page" : "false");
+    });
+  }
+
+  function showRequestPage() {
+    const page = ensurePage();
+    page.hidden = false;
+    document.body.classList.add("ns-request-modal-open");
+    setRequestActive(true);
+    window.setTimeout(function () {
+      page.querySelector("#ns-request-title")?.focus();
+    }, 20);
+  }
+
+  function hideRequestPage() {
+    const page = document.getElementById(VIEW_ID);
+    if (page) page.hidden = true;
+    document.body.classList.remove("ns-request-modal-open");
+    setRequestActive(false);
+  }
+
+  function makeButton(extraClass) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.nsRequestTab = "true";
+    button.className = ("ns-request-nav-button " + (extraClass || "")).trim();
+    button.textContent = TAB_LABEL;
+    button.addEventListener("click", showRequestPage);
+    return button;
+  }
+
+  function addDesktopTab() {
+    const candidates = Array.from(document.querySelectorAll('[role="tablist"], .tabs, .app-tabs, .main-tabs, .top-tabs, .page-tabs, .nav-tabs, header nav, nav'));
+    const target = candidates.find(function (element) {
+      const text = element.textContent || "";
+      return /Akkoorden/i.test(text) && /Zelf samenstellen/i.test(text);
+    });
+    if (!target || target.querySelector("[data-ns-request-tab]")) return;
+    target.appendChild(makeButton("ns-request-desktop-tab"));
+  }
+
+  function addMobileMenuItem() {
+    const candidates = Array.from(document.querySelectorAll(".mobile-menu, .hamburger-menu, .mobile-nav, [data-mobile-menu], .drawer, .menu-panel, nav"));
+    const target = candidates.find(function (element) {
+      const text = element.textContent || "";
+      return /Akkoorden/i.test(text) && !element.querySelector("[data-ns-request-tab]");
+    });
+    if (!target) return;
+    target.appendChild(makeButton("ns-request-mobile-tab"));
+  }
+
+  function bootSongRequestAddon() {
+    ensureStyle();
+    ensurePage();
+    addDesktopTab();
+    addMobileMenuItem();
+
+    document.addEventListener("click", function (event) {
+      const trigger = event.target.closest("button, a");
+      if (!trigger || trigger.dataset.nsRequestTab) return;
+      const label = (trigger.textContent || "").trim();
+      if (/^(Akkoorden|Zelf samenstellen)$/i.test(label)) {
+        hideRequestPage();
+      }
+    });
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !document.getElementById(VIEW_ID)?.hidden) {
+        hideRequestPage();
+      }
+    });
+
+    const observer = new MutationObserver(function () {
+      addDesktopTab();
+      addMobileMenuItem();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  onReady(bootSongRequestAddon);
+})();
+/* Nootstudio polish: keep the song-request form lightweight and make the
+   request tab behave like the other navigation items. */
+(() => {
+  const REQUEST_TITLE = /liedje\s+aan\s*vragen/i;
+  const HIDDEN_REQUEST_FIELD = /naam\s+leerling|waarom\s+wil\s+je\s+dit\s+lied\s+spelen|toonsoort|spotify|youtube/i;
+  const KEEP_REQUEST_FIELD = /titel|title|artiest|artist/i;
+  const HELPER_TEXT = /ontwerpmodus|vraag.*lied|laat.*weten|waarom.*spelen|toonsoort.*origineel/i;
+
+  const normalizeText = (value) => (value || "").replace(/\s+/g, " ").trim();
+
+  function getStoredEmail() {
+    const globals = [
+      window.currentUser?.email,
+      window.nootstudioCurrentUser?.email,
+      window.appState?.user?.email,
+      window.appState?.session?.user?.email,
+      window.state?.user?.email,
+      window.state?.session?.user?.email,
+    ].filter(Boolean);
+
+    if (globals[0]) return globals[0];
+
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key || !key.includes("auth-token")) continue;
+        const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+        const email =
+          parsed?.user?.email ||
+          parsed?.currentSession?.user?.email ||
+          parsed?.session?.user?.email;
+        if (email) return email;
+      }
+    } catch (_) {
+      return "";
+    }
+
+    return "";
+  }
+
+  function findRequestRoots() {
+    const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,.page-title,.section-title"));
+    return headings
+      .filter((heading) => REQUEST_TITLE.test(normalizeText(heading.textContent)))
+      .map((heading) => heading.closest("section,article,.card,.panel,.page,.tab-page,main") || heading.parentElement)
+      .filter(Boolean);
+  }
+
+  function fieldWrapper(element) {
+    return (
+      element.closest(".form-field,.field,.input-field,.form-row,.control,.song-request-field,.request-field,label") ||
+      element.parentElement
+    );
+  }
+
+  function setHiddenEmail(root) {
+    const email = getStoredEmail();
+    if (!email) return;
+
+    root.querySelectorAll("form").forEach((form) => {
+      ["studentEmail", "student_email", "requesterEmail", "requester_email"].forEach((name) => {
+        let input = form.querySelector(`input[name="${name}"]`);
+        if (!input) {
+          input = document.createElement("input");
+          input.type = "hidden";
+          input.name = name;
+          form.appendChild(input);
+        }
+        input.value = email;
+      });
+    });
+
+    root.dataset.studentEmail = email;
+  }
+
+  function simplifyRequestForm() {
+    findRequestRoots().forEach((root) => {
+      root.classList.add("ns-song-request-clean");
+      setHiddenEmail(root);
+
+      root.querySelectorAll("p,small,.muted,.helper,.subtitle,.description,.eyebrow").forEach((element) => {
+        const text = normalizeText(element.textContent);
+        if (HELPER_TEXT.test(text)) element.classList.add("ns-song-request-hidden");
+      });
+
+      root.querySelectorAll("label,.label").forEach((label) => {
+        const text = normalizeText(label.textContent);
+        if (HIDDEN_REQUEST_FIELD.test(text) && !KEEP_REQUEST_FIELD.test(text)) {
+          fieldWrapper(label)?.classList.add("ns-song-request-hidden");
+        }
+      });
+
+      root.querySelectorAll("input,textarea,select").forEach((control) => {
+        const descriptor = normalizeText(
+          [
+            control.name,
+            control.id,
+            control.placeholder,
+            control.getAttribute("aria-label"),
+            control.closest("label")?.textContent,
+          ].join(" ")
+        );
+
+        if (HIDDEN_REQUEST_FIELD.test(descriptor) && !KEEP_REQUEST_FIELD.test(descriptor)) {
+          fieldWrapper(control)?.classList.add("ns-song-request-hidden");
+        }
+      });
+    });
+  }
+
+  function normalizeMobileMenu() {
+    const requestItems = Array.from(document.querySelectorAll("a,button,[role='button']"))
+      .filter((element) => REQUEST_TITLE.test(normalizeText(element.textContent)));
+
+    requestItems.forEach((element) => {
+      element.classList.add("ns-menu-item-plain");
+      element.removeAttribute("aria-describedby");
+    });
+
+    const logout = document.querySelector("#mobileAuthLogout");
+    const menu = document.querySelector("#mobilePageMenu");
+    if (!logout || !menu || !menu.contains(logout) || menu.classList.contains("ns-menu-normalized")) return;
+
+    menu.classList.add("ns-menu-normalized");
+    logout.classList.add("ns-menu-logout");
+
+    const divider = document.createElement("div");
+    divider.className = "ns-menu-divider";
+    divider.setAttribute("aria-hidden", "true");
+    menu.insertBefore(divider, logout);
+    menu.appendChild(logout);
+  }
+
+  let pending = false;
+  function applyNootstudioPolish() {
+    simplifyRequestForm();
+    normalizeMobileMenu();
+  }
+
+  function schedulePolish() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      applyNootstudioPolish();
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", applyNootstudioPolish, { once: true });
+  } else {
+    applyNootstudioPolish();
+  }
+
+  new MutationObserver(schedulePolish).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+})();
+(() => {
+  if (window.__nsMobileMenuVideoPolish) return;
+  window.__nsMobileMenuVideoPolish = true;
+
+  const mobileQuery = window.matchMedia("(max-width: 820px), (hover: none) and (pointer: coarse)");
+  const navLabels = ["Akkoorden", "Zelf samenstellen", "Liedje aanvragen"];
+
+  function isMobileLike() {
+    return mobileQuery.matches;
+  }
+
+  function cleanText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function isClickableElement(element) {
+    return element && element.matches?.("button, a, [role='button'], [tabindex], summary");
+  }
+
+  function findMenuItem(label) {
+    const elements = Array.from(document.querySelectorAll("button, a, [role='button'], [tabindex], summary, li, div"));
+    return elements.find((element) => cleanText(element.textContent) === label && element.offsetParent !== null) || null;
+  }
+
+  function commonAncestor(elements) {
+    const usable = elements.filter(Boolean);
+    if (!usable.length) return null;
+    let parent = usable[0];
+    while (parent && parent !== document.body) {
+      if (usable.every((element) => parent.contains(element))) return parent;
+      parent = parent.parentElement;
+    }
+    return null;
+  }
+
+  function resolveMobileMenu(items) {
+    const candidates = items
+      .map((item) =>
+        item.closest?.(
+          "nav, [role='menu'], [class*='menu'], [class*='Menu'], [class*='drawer'], [class*='Drawer'], [class*='mobile'], [class*='Mobile'], [class*='nav'], [class*='Nav']"
+        ) || item.parentElement
+      )
+      .filter(Boolean);
+    const menu = commonAncestor(candidates) || candidates[0] || null;
+    if (!menu || menu === document.body || menu === document.documentElement) return null;
+    return menu;
+  }
+
+  function closeMobileMenu() {
+    if (!isMobileLike()) return;
+
+    document.querySelectorAll("[aria-expanded='true']").forEach((toggle) => {
+      const text = cleanText(toggle.textContent);
+      if (!text || text.length < 30) toggle.setAttribute("aria-expanded", "false");
+    });
+
+    document.querySelectorAll(".ns-mobile-menu-normalized").forEach((menu) => {
+      menu.classList.add("ns-menu-force-closed");
+      menu.classList.remove("open", "is-open", "menu-open", "nav-open", "drawer-open", "visible", "show", "expanded");
+      window.setTimeout(() => menu.classList.remove("ns-menu-force-closed"), 260);
+    });
+
+    document.body.classList.remove("menu-open", "nav-open", "drawer-open", "mobile-menu-open");
+    document.documentElement.classList.remove("menu-open", "nav-open", "drawer-open", "mobile-menu-open");
+  }
+
+  function normalizeMobileMenu() {
+    if (!isMobileLike()) return;
+
+    const items = navLabels.map(findMenuItem).filter(Boolean);
+    const logout = findMenuItem("Uitloggen");
+    if (!items.length && !logout) return;
+
+    [...items, logout].filter(Boolean).forEach((item) => {
+      item.classList.add("ns-mobile-menu-item");
+      if (cleanText(item.textContent) === "Liedje aanvragen") item.classList.add("ns-mobile-menu-request");
+      if (cleanText(item.textContent) === "Uitloggen") item.classList.add("ns-mobile-menu-logout");
+      if (!item.dataset.nsMenuCloseBound) {
+        item.dataset.nsMenuCloseBound = "1";
+        item.addEventListener("click", () => window.setTimeout(closeMobileMenu, 120));
+      }
+    });
+
+    const menu = resolveMobileMenu([...items, logout].filter(Boolean));
+    if (!menu) return;
+    menu.classList.add("ns-mobile-menu-normalized");
+
+    if (logout && logout.parentElement) {
+      const previous = logout.previousElementSibling;
+      if (!previous || !previous.classList.contains("ns-mobile-menu-divider")) {
+        const divider = document.createElement("div");
+        divider.className = "ns-mobile-menu-divider";
+        divider.setAttribute("aria-hidden", "true");
+        logout.parentElement.insertBefore(divider, logout);
+      }
+    }
+  }
+
+  function isVideoControlTarget(target, shell) {
+    if (!target || !shell) return false;
+    return Boolean(
+      target.closest?.(
+        "input, select, textarea, a, .scale-video-controls, .nootstudio-video-controls, .custom-video-controls, .video-controls, [data-video-control]"
+      )
+    );
+  }
+
+  function showVideoControls(shell, delay = 1150) {
+    if (!shell) return;
+    shell.classList.add("ns-mobile-video-controls-visible");
+    clearTimeout(shell.__nsVideoControlsTimer);
+    shell.__nsVideoControlsTimer = window.setTimeout(() => {
+      shell.classList.remove("ns-mobile-video-controls-visible");
+    }, delay);
+  }
+
+  function updateVideoState(shell, video) {
+    if (!shell || !video) return;
+    shell.classList.toggle("ns-mobile-video-playing", !video.paused && !video.ended);
+    if (video.paused || video.ended) shell.classList.add("ns-mobile-video-controls-visible");
+  }
+
+  function setupVideoPlayers() {
+    if (!isMobileLike()) return;
+
+    document.querySelectorAll("video").forEach((video) => {
+      const shell =
+        video.closest(
+          ".scale-video-player, .scale-video-shell, .scale-video-card, .nootstudio-video-player, .video-player, .video-shell, [class*='videoPlayer'], [class*='VideoPlayer']"
+        ) || video.parentElement;
+      if (!shell || shell.dataset.nsTouchVideoReady) return;
+
+      shell.dataset.nsTouchVideoReady = "1";
+      shell.classList.add("ns-mobile-video-ready", "ns-mobile-video-controls-visible");
+      video.controls = false;
+
+      shell.addEventListener(
+        "click",
+        (event) => {
+          if (!isMobileLike()) return;
+          if (isVideoControlTarget(event.target, shell) && !video.paused) {
+            showVideoControls(shell);
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          if (video.paused || video.ended) {
+            video.play().then(() => showVideoControls(shell, 950)).catch(() => showVideoControls(shell, 1600));
+          } else {
+            showVideoControls(shell, 950);
+          }
+        },
+        true
+      );
+
+      shell.addEventListener("pointerleave", () => {
+        if (!isMobileLike() || video.paused) return;
+        clearTimeout(shell.__nsVideoControlsTimer);
+        shell.__nsVideoControlsTimer = window.setTimeout(() => shell.classList.remove("ns-mobile-video-controls-visible"), 260);
+      });
+
+      video.addEventListener("play", () => {
+        updateVideoState(shell, video);
+        showVideoControls(shell, 950);
+      });
+      video.addEventListener("pause", () => updateVideoState(shell, video));
+      video.addEventListener("ended", () => updateVideoState(shell, video));
+    });
+  }
+
+  function initMobilePolish() {
+    normalizeMobileMenu();
+    setupVideoPlayers();
+  }
+
+  document.addEventListener("DOMContentLoaded", initMobilePolish);
+  window.addEventListener("load", initMobilePolish);
+  mobileQuery.addEventListener?.("change", initMobilePolish);
+  document.addEventListener("click", (event) => {
+    if (!isMobileLike()) return;
+    const menu = event.target.closest?.(".ns-mobile-menu-normalized");
+    const hamburger = event.target.closest?.("[aria-label*='menu' i], [class*='hamburger'], [class*='menuToggle'], [class*='MenuToggle']");
+    if (!menu && !hamburger) closeMobileMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeMobileMenu();
+  });
+
+  const observer = new MutationObserver(() => {
+    window.clearTimeout(observer.__timer);
+    observer.__timer = window.setTimeout(initMobilePolish, 80);
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();

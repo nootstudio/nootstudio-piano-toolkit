@@ -1,0 +1,23 @@
+/* Compact mobile chord sequence with room for two ledger lines below the staff. */
+@media (max-width: 767px) {
+  .chord-sequence-staff {
+    min-height: 120px !important;
+    padding-bottom: 12px !important;
+    box-sizing: border-box;
+  }
+
+  .chord-sequence-head {
+    gap: 8px;
+  }
+
+  .chord-sequence-actions {
+    gap: 5px;
+  }
+
+  #addChordSequence,
+  #searchChordSequence {
+    min-height: 44px;
+    padding: 8px 14px;
+    line-height: 1.15;
+  }
+}
