@@ -9588,7 +9588,7 @@ refreshAuthAccess();
 
       #mobilePageMenu .ns-request-mobile-tab:not(.is-active) {
         background: transparent !important;
-        color: var(--ns-muted) !important;
+        color: var(--ns-ink) !important;
       }
 
       #mobilePageMenu .mobile-page-menu-item,
