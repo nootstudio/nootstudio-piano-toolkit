@@ -8493,7 +8493,7 @@ textarea,
 
 #mobilePageMenu .mobile-auth-logout:hover {
   color: var(--ink) !important;
-  background: rgba(213, 165, 29, 0.16) !important;
+  background: rgba(213, 165, 29, 0.24) !important;
 }
 
 #mobilePageMenu .mobile-page-menu-item,
@@ -8505,7 +8505,7 @@ textarea,
 #mobilePageMenu .mobile-page-menu-item:not(.active):hover,
 #mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
   border-radius: 10px !important;
-  background: rgba(213, 165, 29, 0.16) !important;
+  background: rgba(213, 165, 29, 0.24) !important;
   color: var(--ink) !important;
   transform: none !important;
 }
