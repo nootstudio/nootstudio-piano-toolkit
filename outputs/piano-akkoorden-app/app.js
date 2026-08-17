@@ -9591,12 +9591,6 @@ refreshAuthAccess();
         color: var(--ns-muted) !important;
       }
 
-      #mobilePageMenu .ns-request-mobile-tab.is-menu-hovered:not(.is-active) {
-        border-radius: 10px !important;
-        background: rgba(213, 165, 29, 0.24) !important;
-        color: var(--ns-ink) !important;
-      }
-
       #mobilePageMenu .mobile-page-menu-item,
       #mobilePageMenu .ns-request-mobile-tab {
         border-radius: 10px !important;
@@ -9924,12 +9918,6 @@ refreshAuthAccess();
     });
     if (!target) return;
     const button = makeButton("mobile-page-menu-item ns-request-mobile-tab");
-    button.addEventListener("mouseenter", function () {
-      button.classList.add("is-menu-hovered");
-    });
-    button.addEventListener("mouseleave", function () {
-      button.classList.remove("is-menu-hovered");
-    });
     const divider = target.querySelector(":scope > .ns-menu-divider");
     const logout = target.querySelector("#mobileAuthLogout");
     target.insertBefore(button, divider || logout || null);
