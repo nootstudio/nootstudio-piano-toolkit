@@ -8503,7 +8503,7 @@ textarea,
 }
 
 #mobilePageMenu .ns-request-mobile-tab:not(.is-active) {
-  color: var(--muted) !important;
+  color: var(--ink) !important;
   background: transparent !important;
 }
 
