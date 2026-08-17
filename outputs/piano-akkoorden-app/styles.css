@@ -8502,6 +8502,17 @@ textarea,
   transition: background-color 160ms ease, color 160ms ease !important;
 }
 
+#mobilePageMenu .ns-request-mobile-tab:not(.is-active) {
+  color: var(--muted) !important;
+  background: transparent !important;
+}
+
+#mobilePageMenu .ns-request-mobile-tab.is-menu-hovered:not(.is-active) {
+  border-radius: 10px !important;
+  color: var(--ink) !important;
+  background: rgba(213, 165, 29, 0.24) !important;
+}
+
 #mobilePageMenu .mobile-page-menu-item:not(.active):hover,
 #mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
   border-radius: 10px !important;
