@@ -9913,7 +9913,10 @@ refreshAuthAccess();
       return /Akkoorden/i.test(text) && !element.querySelector("[data-ns-request-tab]");
     });
     if (!target) return;
-    target.appendChild(makeButton("ns-request-mobile-tab"));
+    const button = makeButton("ns-request-mobile-tab");
+    const divider = target.querySelector(":scope > .ns-menu-divider");
+    const logout = target.querySelector("#mobileAuthLogout");
+    target.insertBefore(button, divider || logout || null);
   }
 
   function bootSongRequestAddon() {
@@ -10067,14 +10070,20 @@ refreshAuthAccess();
 
     const logout = document.querySelector("#mobileAuthLogout");
     const menu = document.querySelector("#mobilePageMenu");
-    if (!logout || !menu || !menu.contains(logout) || menu.classList.contains("ns-menu-normalized")) return;
+    if (!logout || !menu || !menu.contains(logout)) return;
 
     menu.classList.add("ns-menu-normalized");
     logout.classList.add("ns-menu-logout");
 
-    const divider = document.createElement("div");
-    divider.className = "ns-menu-divider";
-    divider.setAttribute("aria-hidden", "true");
+    let divider = menu.querySelector(":scope > .ns-menu-divider");
+    if (!divider) {
+      divider = document.createElement("div");
+      divider.className = "ns-menu-divider";
+      divider.setAttribute("aria-hidden", "true");
+      menu.insertBefore(divider, logout);
+    }
+    const requestItem = menu.querySelector(":scope > [data-ns-request-tab]");
+    if (requestItem) menu.insertBefore(requestItem, divider);
     menu.insertBefore(divider, logout);
     menu.appendChild(logout);
   }
