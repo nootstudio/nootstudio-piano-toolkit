@@ -10087,9 +10087,15 @@ refreshAuthAccess();
       menu.insertBefore(divider, logout);
     }
     const requestItem = menu.querySelector(":scope > [data-ns-request-tab]");
-    if (requestItem) menu.insertBefore(requestItem, divider);
-    menu.insertBefore(divider, logout);
-    menu.appendChild(logout);
+    if (requestItem && requestItem.nextElementSibling !== divider) {
+      menu.insertBefore(requestItem, divider);
+    }
+    if (divider.nextElementSibling !== logout) {
+      menu.insertBefore(divider, logout);
+    }
+    if (logout.nextElementSibling) {
+      menu.appendChild(logout);
+    }
   }
 
   let pending = false;
