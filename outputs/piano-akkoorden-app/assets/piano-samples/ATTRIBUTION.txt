@@ -1,0 +1,8 @@
+Salamander Grand Piano samples
+
+Piano: Yamaha C5 grand piano
+Original samples: Alexander Holm
+License: Creative Commons Attribution 3.0 Unported (CC BY 3.0)
+Source: https://github.com/sfzinstruments/SalamanderGrandPiano
+MP3 distribution: https://tonejs.github.io/audio/salamander/
+License text: https://creativecommons.org/licenses/by/3.0/

@@ -14,12 +14,10 @@
       window.addEventListener("load", () => window.setTimeout(startPageAtTop, 0), { once: true });
     }
   </script>
-  <link rel="stylesheet" href="styles.css?v=20260817-measure-edge-spacing-1">
+  <link rel="stylesheet" href="styles.css?v=20260817-menu-hover-1">
   <link rel="stylesheet" href="./song-requests.css">
   <link rel="stylesheet" href="./mobile-fixes.css?v=20260817-video-onetap-1">
   <link rel="stylesheet" href="mobile-notation-fix.css?v=20260816-sequence-spacing-1">
-  <link rel="stylesheet" href="desktop-logout.css">
-  <link rel="stylesheet" href="desktop-nav-logout-v2.css">
 </head>
   <body class="auth-loading">
     <section class="auth-gate" id="authGate" aria-live="polite">
@@ -57,11 +55,15 @@
             <img class="brand-logo" src="assets/nootstudio-piano-toolkit-logo-transparent.png" alt="Nootstudio piano toolkit">
           </h1>
         </div>
-        <nav class="page-tabs" aria-label="Pagina's">
-          <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
-          <button class="page-tab" data-page="song" type="button">Liedje</button>
-          <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
-        </nav>
+        <div class="desktop-nav-area">
+          <button class="desktop-auth-logout" id="desktopAuthLogout" type="button" hidden>Uitloggen</button>
+          <nav class="page-tabs" aria-label="Pagina's">
+            <button class="page-tab active" data-page="chords" type="button">Akkoorden</button>
+            <button class="page-tab" data-page="song" type="button">Liedje</button>
+            <button class="page-tab" data-page="custom" type="button">Zelf samenstellen</button>
+            <button class="page-tab" data-page="ear" type="button">Interactieve gehoortraining</button>
+          </nav>
+        </div>
       </header>
 
       <button class="mobile-page-menu-button" id="mobilePageMenuButton" type="button" aria-label="Menu openen" aria-expanded="false" aria-controls="mobilePageMenu">
@@ -69,9 +71,10 @@
         <span aria-hidden="true"></span>
         <span aria-hidden="true"></span>
       </button>
-      <nav class="mobile-page-menu" id="mobilePageMenu" aria-label="Mobiel menu" hidden>
+      <nav class="mobile-page-menu" id="mobilePageMenu" aria-label="Menu" hidden>
         <button class="mobile-page-menu-item active" data-page="chords" type="button">Akkoorden</button>
         <button class="mobile-page-menu-item" data-page="custom" type="button">Zelf samenstellen</button>
+        <button class="mobile-page-menu-item" data-page="ear" type="button">Interactieve gehoortraining</button>
         <button class="mobile-page-menu-item mobile-auth-logout" id="mobileAuthLogout" type="button" hidden>Uitloggen</button>
       </nav>
 
@@ -178,8 +181,10 @@
                   <button id="resetChordSequence" type="button">Reset</button>
                 </div>
               </div>
-              <div class="chord-sequence-list" id="chordSequenceList" aria-live="polite"></div>
-              <div class="chord-sequence-notation" id="chordSequenceNotation" aria-label="Akkoordreeks op de notenbalk"></div>
+              <div class="chord-sequence-scroll">
+                <div class="chord-sequence-list" id="chordSequenceList" aria-live="polite"></div>
+                <div class="chord-sequence-notation" id="chordSequenceNotation" aria-label="Akkoordreeks op de notenbalk"></div>
+              </div>
               <div class="chord-sequence-results" id="chordSequenceResults" aria-live="polite"></div>
             </section>
             <section class="scale-video-panel" id="scaleVideoPanel" aria-label="Video bij gekozen toonladder">
@@ -224,6 +229,46 @@
           <div class="selected-song-admin-tools" id="selectedSongAdminTools" data-admin-only hidden>
             <button class="song-schema-edit-toggle" id="songSchemaEditToggle" type="button">Bewerk schema</button>
           </div>
+          <section class="selected-song-practice" id="selectedSongPractice" aria-label="Oefenmodus" hidden>
+            <div class="song-practice-head">
+              <div>
+                <h4>Oefenmodus <span>Proefopzet</span></h4>
+                <p>Speel het schema mee op je eigen tempo.</p>
+              </div>
+              <button class="song-practice-start" id="songPracticeToggle" type="button">
+                <span aria-hidden="true"></span>Start oefenen
+              </button>
+            </div>
+            <div class="song-practice-controls">
+              <label>
+                Gedeelte
+                <select id="songPracticeSection"></select>
+              </label>
+              <label>
+                Tempo
+                <span class="song-practice-bpm-field">
+                  <input id="songPracticeBpm" type="number" min="40" max="220" step="1" value="84" inputmode="numeric">
+                  <small>BPM</small>
+                </span>
+              </label>
+              <label class="song-practice-check"><input id="songPracticeCountIn" type="checkbox" checked> Aftellen</label>
+              <label class="song-practice-check"><input id="songPracticeMetronome" type="checkbox" checked> Metronoom</label>
+              <label class="song-practice-check"><input id="songPracticePiano" type="checkbox" checked> Piano</label>
+              <label class="song-practice-check"><input id="songPracticeBass" type="checkbox" checked> Basnoot</label>
+              <label class="song-practice-check"><input id="songPracticeLoop" type="checkbox"> Herhalen</label>
+            </div>
+            <div class="song-practice-now" aria-live="polite">
+              <div class="song-practice-current">
+                <span>Nu</span>
+                <strong id="songPracticeCurrent">Klaar om te beginnen</strong>
+              </div>
+              <div class="song-practice-next">
+                <span>Hierna</span>
+                <strong id="songPracticeNext">-</strong>
+              </div>
+              <span class="song-practice-progress" id="songPracticeProgress"></span>
+            </div>
+          </section>
           <div class="song-schema-editor" id="songSchemaEditor" data-admin-only hidden></div>
           <div class="selected-song-chord-list" id="selectedSongChordList"></div>
         </section>
@@ -245,14 +290,13 @@
               <span>Sorteren</span>
               <select id="inspirationSort">
                 <option value="title" selected>Titel A-Z</option>
-                <option value="recent">Nieuw toegevoegd</option>
                 <option value="artist">Artiest A-Z</option>
-                <option value="year">Jaar</option>
-                <option value="level">Niveau</option>
+                <option value="meter">Maatsoort</option>
+                <option value="level">Moeilijkheidsgraad</option>
+                <option value="style">Genre</option>
               </select>
             </label>
             <button class="inspiration-favorite-filter" id="inspirationFavoriteFilter" type="button">Favorieten</button>
-            <button class="inspiration-group-toggle active" id="inspirationGroupToggle" type="button" aria-pressed="true">Per artiest ✓</button>
           </div>
           <div class="inspiration-list" id="inspirationList"></div>
           <section class="song-library-stats" id="songLibraryStats" data-admin-only hidden aria-label="Liedjesteller">
@@ -291,6 +335,10 @@
                 <label>
                   Jaar
                   <input id="addSongYear" type="text" inputmode="numeric" autocomplete="off">
+                </label>
+                <label>
+                  BPM
+                  <input id="addSongBpm" type="number" min="40" max="220" step="1" inputmode="numeric" placeholder="84">
                 </label>
                 <label>
                   Niveau
@@ -352,6 +400,74 @@
         </section>
       </section>
 
+      <section class="page-view" data-page-view="ear" aria-label="Interactieve gehoortraining">
+        <section class="ear-training-page">
+          <header class="ear-training-hero">
+            <span>Luisteren en herkennen</span>
+            <h2>Interactieve gehoortraining</h2>
+            <p>Kies een oefenronde en train stap voor stap je muzikale gehoor.</p>
+          </header>
+
+          <section class="ear-training-card" aria-label="Gehoortraining oefening">
+            <div class="ear-training-toolbar">
+              <label>
+                Oefening
+                <select id="earTrainingLevel">
+                  <option value="major-minor">Stap 1: majeur of mineur</option>
+                  <option value="four-chords">Stap 2: C, Am, F of G</option>
+                  <option value="bass-root">Stap 3: grondtoon herkennen</option>
+                  <option value="chord-function">Stap 4: I, IV, V of vi</option>
+                  <option value="sequence-memory">Stap 5: akkoordenreeks onthouden</option>
+                  <option value="missing-chord">Stap 6: ontbrekend akkoord</option>
+                </select>
+              </label>
+              <div class="ear-training-stats" aria-label="Score">
+                <span><small>Punten</small><strong id="earTrainingScore">0</strong></span>
+                <span><small>Reeks</small><strong id="earTrainingStreak">0</strong></span>
+                <span><small>Levens</small><strong id="earTrainingLives" aria-label="3 levens">♥ ♥ ♥</strong></span>
+                <span><small>Record</small><strong id="earTrainingBest">0</strong></span>
+              </div>
+            </div>
+
+            <div class="ear-training-progress-block">
+              <div class="ear-training-progress-copy">
+                <span id="earTrainingDailyStatus">Dagtraining · 5 vragen</span>
+                <strong id="earTrainingDifficulty">Niveau: rustig</strong>
+                <small id="earTrainingProgressText">0 van 5</small>
+              </div>
+              <div class="ear-training-progress" role="progressbar" aria-label="Voortgang oefenronde" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0">
+                <span id="earTrainingProgressFill"></span>
+              </div>
+            </div>
+
+            <div class="ear-training-stage">
+              <span class="ear-training-question" id="earTrainingQuestion">Druk op start om te beginnen</span>
+              <button class="ear-training-listen" id="earTrainingListen" type="button" disabled>
+                <span aria-hidden="true"></span>
+                Luister opnieuw
+              </button>
+              <div class="ear-training-answers" id="earTrainingAnswers" aria-label="Antwoorden"></div>
+              <p class="ear-training-feedback" id="earTrainingFeedback" aria-live="polite"></p>
+              <section class="ear-training-reveal" id="earTrainingReveal" aria-label="Uitleg van het antwoord" hidden>
+                <strong id="earTrainingRevealTitle"></strong>
+                <div class="ear-training-reveal-visuals">
+                  <div class="ear-training-reveal-keyboard" id="earTrainingRevealKeyboard"></div>
+                  <div class="song-notation ear-training-reveal-staff" id="earTrainingRevealStaff" aria-label="Akkoord op de notenbalk"></div>
+                </div>
+                <button class="ear-training-compare" id="earTrainingCompare" type="button">Hoor het verschil</button>
+                <small>Eerst hoor je jouw keuze, daarna het juiste antwoord.</small>
+              </section>
+              <button class="ear-training-next" id="earTrainingNext" type="button">Start training</button>
+            </div>
+          </section>
+
+          <section class="ear-training-tip">
+            <strong>Luistertip</strong>
+            <p>De akkoorden klinken in verschillende omkeringen, steeds met de grondtoon in de bas. Luister naar zowel de basnoot als de totale klank.</p>
+          </section>
+        </section>
+      </section>
+
       <section class="page-view" data-page-view="song" aria-label="Liedje">
         <section class="song-page">
           <div class="song-print-actions">
@@ -388,6 +504,7 @@
               <label for="songMeterSelect">Maatsoort</label>
               <select id="songMeterSelect">
                 <option value="4/4">4/4</option>
+                <option value="2/2">𝄵</option>
                 <option value="3/4">3/4</option>
                 <option value="6/8">6/8</option>
                 <option value="12/8">12/8</option>
@@ -400,9 +517,10 @@
             <div class="control-group">
               <label for="songVoicingSelect">Startligging</label>
               <select id="songVoicingSelect">
+                <option value="auto" selected>Automatisch (mooiste ligging)</option>
                 <option value="high">2e omkering (hoog)</option>
                 <option value="middle">1e omkering (midden)</option>
-                <option value="low" selected>Grondligging (laag)</option>
+                <option value="low">Grondligging (laag)</option>
               </select>
             </div>
             <button class="song-play-button" id="songPlayButton" type="button">
@@ -577,10 +695,8 @@
     <script src="https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="app-config.js?v=20260711-dot-staff-tight"></script>
-    <script src="app.js?v=20260817-group-by-artist-1"></script>
+  <script src="app.js?v=20260817-scale-legato-1"></script>
   <script src="./song-requests.js"></script>
-  <script src="./mobile-fixes.js?v=20260817-video-onetap-1"></script>
-  <script src="desktop-logout.js"></script>
-  <script src="desktop-nav-logout-v2.js"></script>
+  <script src="./mobile-fixes.js?v=20260817-ear-training-menu-1"></script>
 </body>
 </html>

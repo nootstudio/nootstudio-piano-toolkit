@@ -217,11 +217,11 @@
       divider.setAttribute("aria-hidden", "true");
       menu.appendChild(divider);
     }
-    divider.style.order = "4";
+    divider.style.order = String(items.length + 1);
 
     if (logout) {
       logout.classList.add("ns-mobile-menu-item", "ns-mobile-menu-logout");
-      logout.style.order = "5";
+      logout.style.order = String(items.length + 2);
     }
 
     [...items, logout].filter(Boolean).forEach((item) => {

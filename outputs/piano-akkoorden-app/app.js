@@ -163,7 +163,7 @@ const songState = {
   scale: scales[0],
   meter: "4/4",
   bpm: 84,
-  startVoicing: "low",
+  startVoicing: "auto",
   view: "edit",
   order: ["intro", "verse", "chorus"],
   sections: defaultSongSections()
@@ -173,8 +173,7 @@ const inspirationState = {
   offset: 0,
   query: "",
   sort: "title",
-  favoritesOnly: false,
-  groupMode: "artist"
+  favoritesOnly: false
 };
 
 const customState = {
@@ -540,6 +539,18 @@ const selectedSongChordList = document.querySelector("#selectedSongChordList");
 const selectedSongAdminTools = document.querySelector("#selectedSongAdminTools");
 const songSchemaEditToggle = document.querySelector("#songSchemaEditToggle");
 const songSchemaEditor = document.querySelector("#songSchemaEditor");
+const selectedSongPractice = document.querySelector("#selectedSongPractice");
+const songPracticeToggle = document.querySelector("#songPracticeToggle");
+const songPracticeSection = document.querySelector("#songPracticeSection");
+const songPracticeBpm = document.querySelector("#songPracticeBpm");
+const songPracticeCountIn = document.querySelector("#songPracticeCountIn");
+const songPracticeMetronome = document.querySelector("#songPracticeMetronome");
+const songPracticePiano = document.querySelector("#songPracticePiano");
+const songPracticeBass = document.querySelector("#songPracticeBass");
+const songPracticeLoop = document.querySelector("#songPracticeLoop");
+const songPracticeCurrent = document.querySelector("#songPracticeCurrent");
+const songPracticeNext = document.querySelector("#songPracticeNext");
+const songPracticeProgress = document.querySelector("#songPracticeProgress");
 const scaleVideoPanel = document.querySelector("#scaleVideoPanel");
 const scaleVideoDetails = document.querySelector("#scaleVideoDetails");
 const scaleVideoTitle = document.querySelector("#scaleVideoTitle");
@@ -568,7 +579,6 @@ const studentCodeStatus = document.querySelector("#studentCodeStatus");
 const inspirationSearch = document.querySelector("#inspirationSearch");
 const inspirationSort = document.querySelector("#inspirationSort");
 const inspirationFavoriteFilter = document.querySelector("#inspirationFavoriteFilter");
-const inspirationGroupToggle = document.querySelector("#inspirationGroupToggle");
 const deleteSelectedSongButton = document.querySelector("#deleteSelectedSongButton");
 const adminOnlyElements = document.querySelectorAll("[data-admin-only]");
 const songLibraryStats = document.querySelector("#songLibraryStats");
@@ -580,6 +590,7 @@ const addSongArtist = document.querySelector("#addSongArtist");
 const addSongKey = document.querySelector("#addSongKey");
 const addSongStyle = document.querySelector("#addSongStyle");
 const addSongYear = document.querySelector("#addSongYear");
+const addSongBpm = document.querySelector("#addSongBpm");
 const addSongLevel = document.querySelector("#addSongLevel");
 const addSongImage = document.querySelector("#addSongImage");
 const addSongYoutube = document.querySelector("#addSongYoutube");
@@ -592,6 +603,26 @@ const mobilePageMenuButton = document.querySelector("#mobilePageMenuButton");
 const mobilePageMenu = document.querySelector("#mobilePageMenu");
 const mobilePageMenuItems = document.querySelectorAll(".mobile-page-menu-item");
 const pageViews = document.querySelectorAll(".page-view");
+const earTrainingLevel = document.querySelector("#earTrainingLevel");
+const earTrainingScore = document.querySelector("#earTrainingScore");
+const earTrainingStreak = document.querySelector("#earTrainingStreak");
+const earTrainingLives = document.querySelector("#earTrainingLives");
+const earTrainingBest = document.querySelector("#earTrainingBest");
+const earTrainingDifficulty = document.querySelector("#earTrainingDifficulty");
+const earTrainingDailyStatus = document.querySelector("#earTrainingDailyStatus");
+const earTrainingProgress = document.querySelector(".ear-training-progress");
+const earTrainingProgressFill = document.querySelector("#earTrainingProgressFill");
+const earTrainingProgressText = document.querySelector("#earTrainingProgressText");
+const earTrainingQuestion = document.querySelector("#earTrainingQuestion");
+const earTrainingListen = document.querySelector("#earTrainingListen");
+const earTrainingAnswers = document.querySelector("#earTrainingAnswers");
+const earTrainingFeedback = document.querySelector("#earTrainingFeedback");
+const earTrainingReveal = document.querySelector("#earTrainingReveal");
+const earTrainingRevealTitle = document.querySelector("#earTrainingRevealTitle");
+const earTrainingRevealKeyboard = document.querySelector("#earTrainingRevealKeyboard");
+const earTrainingRevealStaff = document.querySelector("#earTrainingRevealStaff");
+const earTrainingCompare = document.querySelector("#earTrainingCompare");
+const earTrainingNext = document.querySelector("#earTrainingNext");
 const songKeySelect = document.querySelector("#songKeySelect");
 const songScaleSelect = document.querySelector("#songScaleSelect");
 const songMeterSelect = document.querySelector("#songMeterSelect");
@@ -646,6 +677,7 @@ const authEmail = document.querySelector("#authEmail");
 const authSubmit = document.querySelector("#authSubmit");
 const authStatus = document.querySelector("#authStatus");
 const authLogout = document.querySelector("#authLogout");
+const desktopAuthLogout = document.querySelector("#desktopAuthLogout");
 const mobileAuthLogout = document.querySelector("#mobileAuthLogout");
 const accessCodeForm = document.querySelector("#accessCodeForm");
 const accessCodeEmail = document.querySelector("#accessCodeEmail");
@@ -666,9 +698,52 @@ function syncChordNotationPlacement() {
 
 let audioContext;
 let pianoOutput;
+let pianoSampleContext;
+let pianoSamplesPromise;
+const pianoSampleBuffers = new Map();
+const activePianoSources = new Set();
+const pianoSampleDefinitions = [
+  [21, "A0.mp3"],
+  [24, "C1.mp3"], [27, "Ds1.mp3"], [30, "Fs1.mp3"], [33, "A1.mp3"],
+  [36, "C2.mp3"], [39, "Ds2.mp3"], [42, "Fs2.mp3"], [45, "A2.mp3"],
+  [48, "C3.mp3"], [51, "Ds3.mp3"], [54, "Fs3.mp3"], [57, "A3.mp3"],
+  [60, "C4.mp3"], [63, "Ds4.mp3"], [66, "Fs4.mp3"], [69, "A4.mp3"],
+  [72, "C5.mp3"], [75, "Ds5.mp3"], [78, "Fs5.mp3"], [81, "A5.mp3"],
+  [84, "C6.mp3"]
+];
+let songPlaybackRunId = 0;
 let songTimeouts = [];
 let scaleHighlightTimeouts = [];
 let isSongPlaying = false;
+const songPracticeState = {
+  playing: false,
+  timeouts: [],
+  scheduledClicks: [],
+  sections: [],
+  fallbackTokens: [],
+  songIdentity: "",
+  runId: 0
+};
+const earTrainingState = {
+  current: null,
+  score: 0,
+  correct: 0,
+  total: 0,
+  streak: 0,
+  lives: 3,
+  best: 0,
+  difficulty: 1,
+  correctAtDifficulty: 0,
+  roundSize: 5,
+  roundComplete: false,
+  selectedAnswerId: "",
+  revealTimer: null,
+  answered: false,
+  started: false,
+  lastSignature: "",
+  lastInversion: -1
+};
+let fifthsArrowAngle = null;
 
 function mod(value, base) {
   return ((value % base) + base) % base;
@@ -906,6 +981,14 @@ function notesWithBass(parsedChord, voicingNotes) {
   return bass ? [bass, ...voicingNotes] : voicingNotes;
 }
 
+function songPlaybackNotes(parsedChord, voicingNotes, { includeBass = Boolean(parsedChord?.bass) } = {}) {
+  const higherChord = voicingNotes.map((note) => ({ ...note, absolute: note.absolute + 12 }));
+  if (!includeBass) return higherChord;
+  const bassChord = { ...parsedChord, bass: parsedChord.bass || parsedChord.root };
+  const bass = bassNoteForVoicing(bassChord, voicingNotes);
+  return bass ? [bass, ...higherChord] : higherChord;
+}
+
 function meterDetails(meter = songState.meter) {
   const [beatsText, beatValueText] = String(meter || songState.meter).split("/");
   const beats = Number(beatsText) || 4;
@@ -1000,7 +1083,8 @@ function voicingCenter(notes) {
 function startInversion() {
   if (songState.startVoicing === "middle") return 1;
   if (songState.startVoicing === "high") return 2;
-  return 0;
+  if (songState.startVoicing === "low") return 0;
+  return null;
 }
 
 function voicingDistance(notes, previousNotes, targetCenter = 7) {
@@ -1070,22 +1154,31 @@ function bestVoicing(parsedChord, previousNotes, targetCenter = 7, fixedInversio
 }
 
 function firstSongVoicing(parsedChord) {
-  const inversion = Math.min(startInversion(), parsedChord.quality.intervals.length - 1);
+  const selectedInversion = startInversion();
+  const inversions = selectedInversion == null
+    ? Array.from({ length: parsedChord.quality.intervals.length }, (_item, index) => index)
+    : [Math.min(selectedInversion, parsedChord.quality.intervals.length - 1)];
   const candidates = [];
   for (let rootAbsolute = -12 + parsedChord.root.pitch; rootAbsolute <= 24 + parsedChord.root.pitch; rootAbsolute += 12) {
-    const notes = voicedNotes(parsedChord.root, parsedChord.quality, inversion, rootAbsolute);
-    const absolutes = notes.map((note) => note.absolute);
-    const lowest = Math.min(...absolutes);
-    const highest = Math.max(...absolutes);
-    if (lowest < -8 || highest > 22) continue;
-    candidates.push({
-      inversion,
-      notes,
-      score: Math.abs(voicingCenter(notes) - 7)
+    inversions.forEach((inversion) => {
+      const notes = voicedNotes(parsedChord.root, parsedChord.quality, inversion, rootAbsolute);
+      const absolutes = notes.map((note) => note.absolute);
+      const lowest = Math.min(...absolutes);
+      const highest = Math.max(...absolutes);
+      if (lowest < -8 || highest > 22) return;
+      candidates.push({
+        inversion,
+        notes,
+        score: Math.abs(voicingCenter(notes) - 7)
+      });
     });
   }
   candidates.sort((a, b) => a.score - b.score);
-  return candidates[0] || { inversion, notes: voicedNotes(parsedChord.root, parsedChord.quality, inversion) };
+  const fallbackInversion = selectedInversion ?? 0;
+  return candidates[0] || {
+    inversion: fallbackInversion,
+    notes: voicedNotes(parsedChord.root, parsedChord.quality, fallbackInversion)
+  };
 }
 
 function songVoicing(parsedChord, previousNotes) {
@@ -1817,21 +1910,26 @@ function frequencyFromMidi(midi) {
 }
 
 function getAudioContext() {
-  if (!audioContext) {
+  if (!audioContext || audioContext.state === "closed") {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     audioContext = new AudioContextClass();
+    pianoOutput = null;
+    pianoSampleContext = null;
+    pianoSamplesPromise = null;
+    pianoSampleBuffers.clear();
   }
   return audioContext;
 }
 
 function resetAudioContext() {
-  if (!audioContext) return;
-  const context = audioContext;
-  audioContext = null;
-  pianoOutput = null;
-  if (context.state !== "closed") {
-    context.close().catch(() => {});
-  }
+  activePianoSources.forEach((source) => {
+    try {
+      source.stop();
+    } catch {
+      // A sample that already ended cannot be stopped twice.
+    }
+  });
+  activePianoSources.clear();
 }
 
 function stopStandaloneAudioPlayback() {
@@ -1843,122 +1941,123 @@ function stopStandaloneAudioPlayback() {
   clearScaleKeyHighlights();
 }
 
-function createImpulseResponse(context, seconds = 1.15, decay = 2.6) {
-  const length = Math.floor(context.sampleRate * seconds);
-  const impulse = context.createBuffer(2, length, context.sampleRate);
-  for (let channel = 0; channel < 2; channel += 1) {
-    const data = impulse.getChannelData(channel);
-    for (let index = 0; index < length; index += 1) {
-      const envelope = (1 - index / length) ** decay;
-      data[index] = (Math.random() * 2 - 1) * envelope * 0.42;
-    }
-  }
-  return impulse;
-}
-
 function getPianoOutput(context) {
   if (pianoOutput) return pianoOutput;
-  const dry = context.createGain();
-  const wet = context.createGain();
-  const convolver = context.createConvolver();
   const compressor = context.createDynamicsCompressor();
-  dry.gain.value = 0.9;
-  wet.gain.value = 0.12;
-  convolver.buffer = createImpulseResponse(context);
+  const master = context.createGain();
+  master.gain.value = 0.9;
   compressor.threshold.value = -18;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 3;
-  compressor.attack.value = 0.012;
+  compressor.knee.value = 12;
+  compressor.ratio.value = 2;
+  compressor.attack.value = 0.006;
   compressor.release.value = 0.22;
-  dry.connect(compressor);
-  dry.connect(convolver);
-  convolver.connect(wet);
-  wet.connect(compressor);
-  compressor.connect(context.destination);
-  pianoOutput = dry;
+  compressor.connect(master);
+  master.connect(context.destination);
+  pianoOutput = compressor;
   return pianoOutput;
 }
 
-function playHammerNoise(context, destination, startTime, velocity) {
-  const sampleCount = Math.floor(context.sampleRate * 0.045);
-  const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let index = 0; index < sampleCount; index += 1) {
-    const envelope = 1 - index / sampleCount;
-    data[index] = (Math.random() * 2 - 1) * envelope * envelope;
+async function loadPianoSamples(context = getAudioContext()) {
+  if (pianoSampleContext === context && pianoSampleBuffers.size === pianoSampleDefinitions.length) return;
+  if (pianoSampleContext === context && pianoSamplesPromise) return pianoSamplesPromise;
+  pianoSampleContext = context;
+  pianoSampleBuffers.clear();
+  pianoSamplesPromise = Promise.all(pianoSampleDefinitions.map(async ([midi, filename]) => {
+    const response = await fetch(`assets/piano-samples/${filename}`);
+    if (!response.ok) throw new Error(`Pianosample ontbreekt: ${filename}`);
+    const buffer = await context.decodeAudioData(await response.arrayBuffer());
+    pianoSampleBuffers.set(midi, buffer);
+  })).catch((error) => {
+    pianoSamplesPromise = null;
+    pianoSampleBuffers.clear();
+    throw error;
+  });
+  return pianoSamplesPromise;
+}
+
+async function preparePianoSamples() {
+  const context = getAudioContext();
+  await context.resume?.();
+  await loadPianoSamples(context);
+  return context;
+}
+
+async function pianoContextForPlayback() {
+  try {
+    return await preparePianoSamples();
+  } catch (error) {
+    console.error("De pianosamples konden niet worden geladen.", error);
+    return getAudioContext();
+  }
+}
+
+function nearestPianoSample(targetMidi) {
+  return pianoSampleDefinitions.reduce((nearest, definition) => (
+    Math.abs(definition[0] - targetMidi) < Math.abs(nearest[0] - targetMidi) ? definition : nearest
+  ));
+}
+
+function playFallbackPianoTone(context, frequency, startTime, duration, velocity, options = {}) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.01, velocity), startTime + 0.008);
+  const hasShortRelease = Number.isFinite(options.releaseDuration);
+  const releaseAt = startTime + Math.max(hasShortRelease ? 0.08 : 0.7, duration);
+  const stopAt = hasShortRelease ? releaseAt + options.releaseDuration : startTime + Math.max(0.75, duration) + 0.05;
+  if (hasShortRelease) gain.gain.setValueAtTime(Math.max(0.008, velocity * 0.82), releaseAt);
+  gain.gain.exponentialRampToValueAtTime(0.0001, hasShortRelease ? stopAt : releaseAt);
+  oscillator.connect(gain);
+  gain.connect(getPianoOutput(context));
+  oscillator.start(startTime);
+  oscillator.stop(stopAt);
+}
+
+function playPianoTone(context, frequency, startTime, duration, velocity, options = {}) {
+  if (pianoSampleContext !== context || !pianoSampleBuffers.size) {
+    playFallbackPianoTone(context, frequency, startTime, duration, velocity, options);
+    return;
+  }
+  const targetMidi = 69 + 12 * Math.log2(frequency / 440);
+  const [sampleMidi] = nearestPianoSample(targetMidi);
+  const buffer = pianoSampleBuffers.get(sampleMidi);
+  if (!buffer) {
+    playFallbackPianoTone(context, frequency, startTime, duration, velocity, options);
+    return;
   }
   const source = context.createBufferSource();
-  const filter = context.createBiquadFilter();
   const gain = context.createGain();
-  filter.type = "bandpass";
-  filter.frequency.setValueAtTime(2400, startTime);
-  filter.Q.setValueAtTime(0.7, startTime);
-  gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(Math.max(0.002, velocity * 0.18), startTime + 0.006);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.055);
+  const stereo = context.createStereoPanner?.() || null;
+  const releaseDuration = Number.isFinite(options.releaseDuration) ? options.releaseDuration : 0.7;
+  const minimumDuration = Number.isFinite(options.minimumDuration) ? options.minimumDuration : 0.45;
+  const releaseAt = startTime + Math.max(minimumDuration, duration);
+  const stopAt = releaseAt + releaseDuration;
   source.buffer = buffer;
-  source.connect(filter);
-  filter.connect(gain);
-  gain.connect(destination);
+  source.playbackRate.setValueAtTime(2 ** ((targetMidi - sampleMidi) / 12), startTime);
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.035, velocity * 1.7), startTime + 0.008);
+  gain.gain.setValueAtTime(Math.max(0.025, velocity * 1.45), releaseAt);
+  gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+  source.connect(gain);
+  if (stereo) {
+    stereo.pan.setValueAtTime(Math.max(-0.32, Math.min(0.32, (targetMidi - 51) / 70)), startTime);
+    gain.connect(stereo);
+    stereo.connect(getPianoOutput(context));
+  } else {
+    gain.connect(getPianoOutput(context));
+  }
+  activePianoSources.add(source);
+  source.addEventListener("ended", () => activePianoSources.delete(source), { once: true });
   source.start(startTime);
-  source.stop(startTime + 0.06);
+  source.stop(stopAt);
 }
 
-function playPianoTone(context, frequency, startTime, duration, velocity) {
-  const destination = getPianoOutput(context);
-  const output = context.createGain();
-  const filter = context.createBiquadFilter();
-  const body = context.createGain();
-  const lowShelf = context.createBiquadFilter();
-  const highShelf = context.createBiquadFilter();
-  lowShelf.type = "lowshelf";
-  lowShelf.frequency.setValueAtTime(180, startTime);
-  lowShelf.gain.setValueAtTime(3.8, startTime);
-  highShelf.type = "highshelf";
-  highShelf.frequency.setValueAtTime(2600, startTime);
-  highShelf.gain.setValueAtTime(-8, startTime);
-  filter.type = "lowpass";
-  filter.frequency.setValueAtTime(3600, startTime);
-  filter.frequency.exponentialRampToValueAtTime(950, startTime + Math.max(0.8, duration * 0.75));
-  body.gain.setValueAtTime(0.0001, startTime);
-  body.gain.exponentialRampToValueAtTime(velocity * 0.92, startTime + 0.028);
-  body.gain.exponentialRampToValueAtTime(Math.max(0.0001, velocity * 0.62), startTime + 0.38);
-  body.gain.exponentialRampToValueAtTime(Math.max(0.0001, velocity * 0.28), startTime + duration * 0.92);
-  body.gain.exponentialRampToValueAtTime(0.0001, startTime + duration * 1.95);
-  filter.connect(lowShelf);
-  lowShelf.connect(highShelf);
-  highShelf.connect(body);
-  body.connect(output);
-  output.gain.setValueAtTime(0.78, startTime);
-  output.connect(destination);
-
-  [
-    { multiple: 1, gain: 0.82, type: "sine", detune: 0, decay: 1.9 },
-    { multiple: 1.006, gain: 0.52, type: "triangle", detune: 6, decay: 1.65 },
-    { multiple: 2.01, gain: 0.5, type: "sine", detune: -5, decay: 1.15 },
-    { multiple: 3.02, gain: 0.22, type: "sine", detune: 4, decay: 0.72 },
-    { multiple: 4.04, gain: 0.13, type: "sine", detune: -7, decay: 0.48 },
-    { multiple: 5.08, gain: 0.06, type: "sine", detune: 8, decay: 0.35 }
-  ].forEach((partial) => {
-    const osc = context.createOscillator();
-    const gain = context.createGain();
-    osc.type = partial.type;
-    osc.frequency.setValueAtTime(frequency * partial.multiple, startTime);
-    osc.detune.setValueAtTime(partial.detune, startTime);
-    gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.exponentialRampToValueAtTime(partial.gain, startTime + 0.024);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + Math.max(0.4, duration * partial.decay));
-    osc.connect(gain);
-    gain.connect(filter);
-    osc.start(startTime);
-    osc.stop(startTime + duration * 2 + 0.08);
-  });
-}
-
-function playCurrentChord() {
+async function playCurrentChord() {
   if (state.chordMode !== "search" && !state.chordActive) return;
   if (!isSongPlaying) resetAudioContext();
-  const context = getAudioContext();
+  const context = await pianoContextForPlayback();
   const now = context.currentTime + 0.03;
   const scale = scaleNotes(state.key, state.scale);
   const rootAbsolute = state.selectedRootAbsolute ?? bestRootAbsoluteForScale(state.root, state.quality, state.inversion, scale);
@@ -1994,21 +2093,31 @@ function highlightScaleKey(note, delayMs, durationMs) {
   scaleHighlightTimeouts.push(timeout);
 }
 
-function playCurrentScale() {
+async function playCurrentScale() {
   stopStandaloneAudioPlayback();
-  const context = getAudioContext();
+  const context = await pianoContextForPlayback();
   const scale = scaleNotes(state.key, state.scale);
   const finalRoot = scale[0]
     ? { ...scale[0], absolute: scale[0].absolute + 12 }
     : null;
   const notes = finalRoot ? [...scale, finalRoot] : scale;
   const now = context.currentTime + 0.04;
+  const noteStep = 0.46;
   notes.forEach((note, index) => {
     const isLast = index === notes.length - 1;
-    const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute - 12));
-    const delay = index * 0.42;
-    playPianoTone(context, frequency, now + delay, isLast ? 2.1 : 1.45, isLast ? 0.2 : 0.16);
-    highlightScaleKey(note, delay * 1000, isLast ? 650 : 420);
+    const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute));
+    const delay = index * noteStep;
+    playPianoTone(
+      context,
+      frequency,
+      now + delay,
+      isLast ? 1.2 : 0.37,
+      isLast ? 0.2 : 0.16,
+      isLast
+        ? { minimumDuration: 1.2, releaseDuration: 0.3 }
+        : { minimumDuration: 0.37, releaseDuration: 0.08 }
+    );
+    highlightScaleKey(note, delay * 1000, isLast ? 700 : noteStep * 1000);
   });
 }
 
@@ -2247,6 +2356,7 @@ function normalizeSongJsonEntry(entry) {
     artist,
     style: entry.style || entry.genre || "",
     year: entry.year || entry.jaar || "",
+    bpm: entry.bpm || entry.tempo || "",
     level: entry.level || entry.niveau || "",
     image: entry.image || entry.afbeelding || "",
     youtube: entry.youtube || entry.youtubeLink || entry.youtubeUrl || "",
@@ -2438,6 +2548,7 @@ function setAuthView(mode) {
   document.body.classList.add(mode);
   if (authGate) authGate.hidden = mode === "auth-unlocked";
   if (authLogout) authLogout.hidden = mode !== "auth-unlocked";
+  if (desktopAuthLogout) desktopAuthLogout.hidden = mode !== "auth-unlocked";
   if (mobileAuthLogout) mobileAuthLogout.hidden = mode !== "auth-unlocked";
 }
 
@@ -2935,6 +3046,34 @@ function compareSongText(left, right, field) {
   return String(left[field] || "").localeCompare(String(right[field] || ""), "nl", { sensitivity: "base" });
 }
 
+function songMeter(song) {
+  return song.meter || song.sections?.find((section) => section.meter)?.meter || "";
+}
+
+function compareOptionalSongText(left, right, field) {
+  const leftValue = String(left[field] || "").trim();
+  const rightValue = String(right[field] || "").trim();
+  if (!leftValue && rightValue) return 1;
+  if (leftValue && !rightValue) return -1;
+  return leftValue.localeCompare(rightValue, "nl", { sensitivity: "base" });
+}
+
+function songDifficultyRank(song) {
+  const level = String(song.level || "").toLowerCase();
+  if (/begin|starter|makkelijk|eenvoudig/.test(level)) return 1;
+  if (/gemiddeld|intermediate|medium/.test(level)) return 2;
+  if (/gevorderd|advanced|moeilijk/.test(level)) return 3;
+  return 4;
+}
+
+function songDifficultyLabel(song) {
+  const rank = songDifficultyRank(song);
+  if (rank === 1) return "Beginner";
+  if (rank === 2) return "Intermediate";
+  if (rank === 3) return "Advanced";
+  return "Niet ingedeeld";
+}
+
 function songFromSuggestionItem(item) {
   return item?.song || item;
 }
@@ -2955,23 +3094,40 @@ function filteredSortedSuggestions(suggestions) {
     const leftSong = songFromSuggestionItem(left);
     const rightSong = songFromSuggestionItem(right);
     if (inspirationState.sort === "title") return compareSongText(leftSong, rightSong, "title");
-    if (inspirationState.sort === "artist") return compareSongText(leftSong, rightSong, "artist") || compareSongText(leftSong, rightSong, "title");
-    if (inspirationState.sort === "year") return (Number(rightSong.year) || 0) - (Number(leftSong.year) || 0) || compareSongText(leftSong, rightSong, "title");
-    if (inspirationState.sort === "level") return compareSongText(leftSong, rightSong, "level") || compareSongText(leftSong, rightSong, "title");
-    return 0;
+    if (inspirationState.sort === "artist") return compareOptionalSongText(leftSong, rightSong, "artist") || compareSongText(leftSong, rightSong, "title");
+    if (inspirationState.sort === "meter") {
+      const leftMeter = songMeter(leftSong);
+      const rightMeter = songMeter(rightSong);
+      if (!leftMeter && rightMeter) return 1;
+      if (leftMeter && !rightMeter) return -1;
+      return leftMeter.localeCompare(rightMeter, "nl", { numeric: true, sensitivity: "base" }) || compareSongText(leftSong, rightSong, "title");
+    }
+    if (inspirationState.sort === "level") {
+      return songDifficultyRank(leftSong) - songDifficultyRank(rightSong)
+        || compareSongText(leftSong, rightSong, "title");
+    }
+    if (inspirationState.sort === "style") return compareOptionalSongText(leftSong, rightSong, "style") || compareSongText(leftSong, rightSong, "title");
+    return compareSongText(leftSong, rightSong, "title");
   });
 }
 
-function groupedSuggestions(suggestions, mode = "style") {
-  return suggestions.reduce((groups, item) => {
-    const song = songFromSuggestionItem(item);
-    const label = mode === "artist"
-      ? song.artist || "Onbekende artiest"
-      : song.style || "Overig";
-    groups[label] ||= [];
-    groups[label].push(item);
-    return groups;
-  }, {});
+function songSortGroupLabel(song, sort = inspirationState.sort) {
+  if (sort === "artist") return song.artist || "Onbekende artiest";
+  if (sort === "meter") return songMeter(song) || "Onbekende maatsoort";
+  if (sort === "level") return songDifficultyLabel(song);
+  if (sort === "style") return song.style || "Overig";
+  const firstCharacter = String(song.title || "").trim().charAt(0).toLocaleUpperCase("nl-NL");
+  return /[\p{L}\p{N}]/u.test(firstCharacter) ? firstCharacter : "#";
+}
+
+function groupedSuggestions(suggestions, sort = inspirationState.sort) {
+  const groups = new Map();
+  suggestions.forEach((item) => {
+    const label = songSortGroupLabel(songFromSuggestionItem(item), sort);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(item);
+  });
+  return [...groups.entries()];
 }
 
 async function applyStudentCode(value) {
@@ -3185,14 +3341,9 @@ function renderSongInspirations() {
     ? `Zoeken in alle toonsoorten`
     : `${formatMusicText(keyText)} - oefen met deze toonladder`;
   inspirationList.innerHTML = "";
+  inspirationList.classList.remove("flat-song-list");
   if (inspirationStatus) inspirationStatus.textContent = "";
   inspirationFavoriteFilter?.classList.toggle("active", inspirationState.favoritesOnly);
-  if (inspirationGroupToggle) {
-    const groupedByArtist = inspirationState.groupMode === "artist";
-    inspirationGroupToggle.classList.toggle("active", groupedByArtist);
-    inspirationGroupToggle.setAttribute("aria-pressed", String(groupedByArtist));
-    inspirationGroupToggle.textContent = groupedByArtist ? "Per artiest ✓" : "Per artiest";
-  }
   if (!suggestions.length) {
     inspirationList.innerHTML = `<p class="inspiration-empty">Geen liedjes gevonden.</p>`;
     inspirationRefreshButton.hidden = true;
@@ -3234,21 +3385,20 @@ function renderSongInspirations() {
     });
     target.append(card);
   };
-  const groupedByArtist = inspirationState.groupMode === "artist";
-  const suggestionGroups = Object.entries(groupedSuggestions(suggestions, groupedByArtist ? "artist" : "style"));
-  if (groupedByArtist) {
-    suggestionGroups.sort(([left], [right]) => left.localeCompare(right, "nl", { sensitivity: "base" }));
-  }
-  suggestionGroups.forEach(([groupLabel, songs]) => {
+  groupedSuggestions(suggestions).forEach(([groupLabel, songs]) => {
+    const isCutTimeGroup = inspirationState.sort === "meter" && groupLabel === "2/2";
+    const groupHeading = isCutTimeGroup ? "C" : escapeHtml(groupLabel);
+    const groupHeadingAttributes = isCutTimeGroup
+      ? ' class="cut-time-symbol" aria-label="2/2 maat, alla breve"'
+      : "";
     const section = document.createElement("section");
-    section.className = "inspiration-group";
-    section.classList.toggle("grouped-by-artist", groupedByArtist);
+    section.className = "inspiration-group sort-group";
     section.innerHTML = `
       <h3>
-        <span>${escapeHtml(groupLabel)}</span>
-        ${groupedByArtist ? `<small>${songs.length} ${songs.length === 1 ? "liedje" : "liedjes"}</small>` : ""}
+        <span${groupHeadingAttributes}>${groupHeading}</span>
+        <small>${songs.length} ${songs.length === 1 ? "liedje" : "liedjes"}</small>
       </h3>
-      <div class="inspiration-group-list"></div>
+      <div class="inspiration-group-list" aria-label="${escapeHtml(groupLabel)}"></div>
     `;
     const list = section.querySelector(".inspiration-group-list");
     songs.forEach((song) => renderSongCard(song, list));
@@ -3716,6 +3866,12 @@ function renderModulationMarker(keyLabel) {
 function selectedSongMeterMark(meter) {
   const mark = document.createElement("div");
   mark.className = "selected-song-meter";
+  if (String(meter || "4/4").trim() === "2/2") {
+    mark.classList.add("is-cut-time");
+    mark.setAttribute("aria-label", "2/2 maat, alla breve");
+    mark.innerHTML = '<span class="cut-time-symbol" aria-hidden="true">C</span>';
+    return mark;
+  }
   const [top = "4", bottom = "4"] = String(meter || "4/4").split("/");
   mark.innerHTML = `<b>${formatMusicText(top)}</b><b>${formatMusicText(bottom)}</b>`;
   return mark;
@@ -3907,6 +4063,12 @@ function setupNootstudioAudioPlayer(player) {
 function songGridMeterMark(meter) {
   const mark = document.createElement("div");
   mark.className = "meter-mark";
+  if (String(meter || "4/4").trim() === "2/2") {
+    mark.classList.add("is-cut-time");
+    mark.setAttribute("aria-label", "2/2 maat, alla breve");
+    mark.innerHTML = '<span class="cut-time-symbol" aria-hidden="true">C</span>';
+    return mark;
+  }
   const [top = "4", bottom = "4"] = String(meter || "4/4").split("/");
   mark.innerHTML = `<b>${formatMusicText(top)}</b><b>${formatMusicText(bottom)}</b>`;
   return mark;
@@ -3982,6 +4144,302 @@ function measuresHaveFirstAndSecondEndings(measures = []) {
     && measures.some((measure) => measureHasEndingNumber(measure, 2));
 }
 
+function numberedSongSectionTitles(sections = []) {
+  const sectionInfo = sections.map((section) => {
+    const originalTitle = String(section.title || "Gedeelte").trim();
+    const baseTitle = originalTitle.replace(/\s+\d+\s*$/u, "").trim() || originalTitle;
+    return {
+      section,
+      originalTitle,
+      baseTitle,
+      key: baseTitle.toLocaleLowerCase("nl-NL")
+    };
+  });
+  const totals = sectionInfo.reduce((counts, item) => {
+    counts[item.key] = (counts[item.key] || 0) + 1;
+    return counts;
+  }, {});
+  const seen = {};
+  return sectionInfo.map((item) => {
+    seen[item.key] = (seen[item.key] || 0) + 1;
+    return {
+      ...item.section,
+      title: totals[item.key] > 1 ? `${item.baseTitle} ${seen[item.key]}` : item.originalTitle
+    };
+  });
+}
+
+function selectedSongPracticeIdentity(song = state.selectedInspirationSong) {
+  if (!song) return "";
+  return `${song.title || ""}::${song.artist || ""}::${song.bpm || ""}`;
+}
+
+function clearSongPracticeHighlights() {
+  selectedSongChordList?.querySelectorAll(".practice-current, .practice-next").forEach((button) => {
+    button.classList.remove("practice-current", "practice-next");
+  });
+}
+
+function updateSongPracticeButton() {
+  if (!songPracticeToggle) return;
+  songPracticeToggle.classList.toggle("playing", songPracticeState.playing);
+  songPracticeToggle.innerHTML = songPracticeState.playing
+    ? `<span aria-hidden="true"></span>Stop`
+    : `<span aria-hidden="true"></span>Start oefenen`;
+  selectedSongPractice?.classList.toggle("is-playing", songPracticeState.playing);
+}
+
+function resetSongPracticeStatus() {
+  if (songPracticeCurrent) songPracticeCurrent.textContent = "Klaar om te beginnen";
+  if (songPracticeNext) songPracticeNext.textContent = "-";
+  if (songPracticeProgress) songPracticeProgress.textContent = "";
+}
+
+function stopSelectedSongPractice({ resetStatus = true, stopAudio = true } = {}) {
+  songPracticeState.runId += 1;
+  songPracticeState.timeouts.forEach((timeout) => window.clearTimeout(timeout));
+  songPracticeState.timeouts = [];
+  songPracticeState.scheduledClicks.forEach((source) => {
+    try {
+      source.stop();
+    } catch {
+      // A click that already ended cannot be stopped twice.
+    }
+  });
+  songPracticeState.scheduledClicks = [];
+  songPracticeState.playing = false;
+  clearSongPracticeHighlights();
+  if (stopAudio) resetAudioContext();
+  if (resetStatus) resetSongPracticeStatus();
+  updateSongPracticeButton();
+}
+
+function songPracticeSelectedSectionIndexes() {
+  if (!songPracticeSection || songPracticeSection.value === "all") {
+    return new Set(songPracticeState.sections.map((_section, index) => index));
+  }
+  return new Set([Number(songPracticeSection.value)]);
+}
+
+function songPracticeEvents() {
+  const selectedIndexes = songPracticeSelectedSectionIndexes();
+  const events = [];
+  const measureTimeline = [];
+  let displayIndex = 0;
+  let beatCursor = 0;
+  songPracticeState.sections.forEach((section, sectionIndex) => {
+    const includeSection = selectedIndexes.has(sectionIndex);
+    const displayIndexes = section.measures.map((measure) => measure.chords.map(() => {
+      const index = displayIndex;
+      displayIndex += 1;
+      return index;
+    }));
+    const playbackMeasureIndexes = expandedPartMeasureIndexes({ measures: section.measures, repeat: 1 });
+    playbackMeasureIndexes.forEach((measureIndex) => {
+      const measure = section.measures[measureIndex];
+      const display = meterDisplayDetails(measureMeter(measure, section.meter));
+      const measureBeats = Math.max(1, display.visualBeats);
+      if (includeSection) {
+        measureTimeline.push({
+          startBeat: beatCursor,
+          beats: measureBeats,
+          measureIndex,
+          sectionTitle: section.title
+        });
+      }
+      measure.chords.forEach((entry, chordIndex) => {
+        if (includeSection) {
+          events.push({
+            token: chordEntryToken(entry),
+            beats: Math.max(0.25, Number(entry.beats) || 1),
+            startBeat: beatCursor + Math.max(0, Number(entry.startBeat || 1) - 1),
+            measureBeats,
+            measureIndex,
+            sectionTitle: section.title,
+            keyLabel: measure.key || section.key || selectedSongTransposeKeyLabel(),
+            displayIndex: displayIndexes[measureIndex][chordIndex]
+          });
+        }
+      });
+      if (includeSection) beatCursor += measureBeats;
+    });
+  });
+
+  if (!events.length && songPracticeState.fallbackTokens.length) {
+    songPracticeState.fallbackTokens.forEach((entry, index) => {
+      measureTimeline.push({
+        startBeat: index * 4,
+        beats: 4,
+        measureIndex: index,
+        sectionTitle: "Schema"
+      });
+      events.push({
+        token: chordEntryToken(entry),
+        beats: 4,
+        startBeat: index * 4,
+        measureBeats: 4,
+        measureIndex: index,
+        sectionTitle: "Schema",
+        keyLabel: selectedSongTransposeKeyLabel(),
+        displayIndex: index
+      });
+    });
+  }
+  events.measureTimeline = measureTimeline;
+  return events;
+}
+
+function scheduleSongPracticeClick(context, time, accent = false) {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(accent ? 1280 : 880, time);
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.exponentialRampToValueAtTime(accent ? 0.18 : 0.1, time + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.055);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(time);
+  oscillator.stop(time + 0.065);
+  songPracticeState.scheduledClicks.push(oscillator);
+}
+
+function setSongPracticeActiveEvent(events, eventIndex) {
+  clearSongPracticeHighlights();
+  const event = events[eventIndex];
+  const nextEvent = events[eventIndex + 1];
+  if (!event) return;
+  const currentButton = selectedSongChordList?.querySelector(`[data-practice-index="${event.displayIndex}"]`);
+  const nextButton = nextEvent
+    ? selectedSongChordList?.querySelector(`[data-practice-index="${nextEvent.displayIndex}"]`)
+    : null;
+  currentButton?.classList.add("practice-current");
+  nextButton?.classList.add("practice-next");
+  if (songPracticeCurrent) songPracticeCurrent.innerHTML = formatMusicText(event.token || "N.C.");
+  if (songPracticeNext) songPracticeNext.innerHTML = nextEvent ? formatMusicText(nextEvent.token || "N.C.") : "Einde";
+  if (songPracticeProgress) {
+    songPracticeProgress.textContent = `${event.sectionTitle} - maat ${event.measureIndex + 1} - ${eventIndex + 1}/${events.length}`;
+  }
+  if (currentButton) {
+    const rect = currentButton.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      currentButton.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    }
+  }
+}
+
+async function startSelectedSongPractice() {
+  stopSelectedSongPractice({ resetStatus: false });
+  const events = songPracticeEvents();
+  if (!events.length) {
+    if (songPracticeCurrent) songPracticeCurrent.textContent = "Geen akkoorden gevonden";
+    return;
+  }
+
+  const bpm = Math.max(40, Math.min(220, Number(songPracticeBpm?.value) || 84));
+  if (songPracticeBpm) songPracticeBpm.value = String(bpm);
+  const secondsPerBeat = 60 / bpm;
+  const countInBeats = songPracticeCountIn?.checked ? Math.max(1, events[0].measureBeats) : 0;
+  const finalEvent = events[events.length - 1];
+  const measureTimeline = events.measureTimeline || [];
+  const finalMeasure = measureTimeline[measureTimeline.length - 1];
+  const totalBeats = Math.max(
+    finalMeasure ? finalMeasure.startBeat + finalMeasure.beats : finalEvent.startBeat + finalEvent.beats,
+    1
+  );
+  const runId = songPracticeState.runId;
+  const context = songPracticePiano?.checked
+    ? await pianoContextForPlayback()
+    : getAudioContext();
+  if (songPracticeState.runId !== runId) return;
+  context.resume?.().catch(() => {});
+  const startAt = context.currentTime + 0.08;
+  songPracticeState.playing = true;
+  updateSongPracticeButton();
+
+  if (countInBeats) {
+    if (songPracticeCurrent) songPracticeCurrent.textContent = "Aftellen";
+    if (songPracticeNext) songPracticeNext.innerHTML = formatMusicText(events[0].token || "N.C.");
+    if (songPracticeProgress) songPracticeProgress.textContent = `${Math.round(countInBeats)} tellen vooraf`;
+  }
+
+  if (songPracticeMetronome?.checked) {
+    for (let beat = 0; beat < Math.ceil(countInBeats + totalBeats); beat += 1) {
+      const songBeat = Math.max(0, beat - countInBeats);
+      const activeMeasure = [...measureTimeline]
+        .reverse()
+        .find((measure) => measure.startBeat <= songBeat) || measureTimeline[0];
+      const accent = beat < countInBeats
+        ? beat === 0
+        : Boolean(activeMeasure) && Math.abs(songBeat - activeMeasure.startBeat) < 0.01;
+      scheduleSongPracticeClick(context, startAt + beat * secondsPerBeat, accent);
+    }
+  }
+
+  let previousNotes = null;
+  events.forEach((event, eventIndex) => {
+    const eventTime = startAt + (countInBeats + event.startBeat) * secondsPerBeat;
+    const delayMs = (countInBeats + event.startBeat) * secondsPerBeat * 1000;
+    const parsed = parseChordToken(event.token);
+    if (songPracticePiano?.checked && parsed && !parsed.noChord) {
+      const voicing = songVoicing(parsed, previousNotes);
+      previousNotes = voicing.notes;
+      const playbackNotes = songPlaybackNotes(parsed, voicing.notes, {
+        includeBass: Boolean(songPracticeBass?.checked)
+      });
+      playNotesAt(
+        playbackNotes,
+        eventTime,
+        Math.max(0.35, event.beats * secondsPerBeat * 0.82)
+      );
+    }
+    songPracticeState.timeouts.push(window.setTimeout(() => {
+      if (songPracticeState.runId !== runId) return;
+      setSongPracticeActiveEvent(events, eventIndex);
+    }, delayMs));
+  });
+
+  const endDelay = (countInBeats + totalBeats) * secondsPerBeat * 1000 + 120;
+  songPracticeState.timeouts.push(window.setTimeout(() => {
+    if (songPracticeState.runId !== runId) return;
+    const shouldLoop = Boolean(songPracticeLoop?.checked);
+    stopSelectedSongPractice({ resetStatus: !shouldLoop });
+    if (shouldLoop) startSelectedSongPractice();
+  }, endDelay));
+}
+
+function renderSelectedSongPractice(sections, fallbackTokens = []) {
+  if (!selectedSongPractice) return;
+  const hasChords = Boolean(sections?.some((section) => section.measures.some((measure) => measure.chords.length)))
+    || fallbackTokens.length > 0;
+  selectedSongPractice.hidden = !hasChords;
+  songPracticeState.sections = sections || [];
+  songPracticeState.fallbackTokens = fallbackTokens;
+  if (!hasChords) return;
+
+  const identity = selectedSongPracticeIdentity();
+  if (songPracticeState.songIdentity !== identity) {
+    stopSelectedSongPractice();
+    songPracticeState.songIdentity = identity;
+    if (songPracticeBpm) songPracticeBpm.value = String(Math.max(40, Math.min(220, Number(state.selectedInspirationSong?.bpm) || 84)));
+  }
+
+  const previousValue = songPracticeSection?.value || "all";
+  if (songPracticeSection) {
+    songPracticeSection.innerHTML = `<option value="all">Hele liedje</option>`;
+    songPracticeState.sections.forEach((section, index) => {
+      const option = document.createElement("option");
+      option.value = String(index);
+      option.textContent = section.title || `Gedeelte ${index + 1}`;
+      songPracticeSection.append(option);
+    });
+    songPracticeSection.value = [...songPracticeSection.options].some((option) => option.value === previousValue)
+      ? previousValue
+      : "all";
+  }
+  updateSongPracticeButton();
+}
+
 function renderSelectedInspirationSong() {
   const song = state.selectedInspirationSong;
   if (!selectedSongChords || !selectedSongChordList) return;
@@ -3989,6 +4447,9 @@ function renderSelectedInspirationSong() {
   const hasChordData = songHasChordData(song);
   selectedSongChords.hidden = !song || (!hasMedia && !hasChordData);
   if (!song) {
+    stopSelectedSongPractice();
+    if (selectedSongPractice) selectedSongPractice.hidden = true;
+    songPracticeState.songIdentity = "";
     state.schemaEditMode = false;
     updateAdminUi();
     return;
@@ -3996,7 +4457,7 @@ function renderSelectedInspirationSong() {
 
   selectedSongTitle.textContent = song.title;
   if (selectedSongArtist) selectedSongArtist.textContent = song.artist || "";
-  selectedSongMeta.textContent = [song.style, song.year, song.level].filter(Boolean).join(" - ");
+  selectedSongMeta.textContent = [song.style, song.year, song.bpm ? `${song.bpm} BPM` : "", song.level].filter(Boolean).join(" - ");
   if (selectedSongTranspose) {
     const transposeKey = keyOptionFromLabel(selectedSongTransposeKeyLabel(song)) || state.key;
     selectedSongTranspose.value = String(keyOptions.indexOf(transposeKey));
@@ -4012,7 +4473,7 @@ function renderSelectedInspirationSong() {
   appendSongMedia();
   const displaySections = transposedSongSections(song);
   const sections = Array.isArray(displaySections) && displaySections.length
-    ? displaySections.map((section) => {
+    ? numberedSongSectionTitles(displaySections).map((section) => {
       let runningMeter = section.meter || song.meter || "4/4";
       return {
         title: section.title,
@@ -4040,12 +4501,14 @@ function renderSelectedInspirationSong() {
   const tokens = sections
     ? sections.flatMap((section) => section.measures.flatMap((measure) => measure.chords))
     : inspirationChordTokens(song).map((token) => transposeChordEntry(token, interval, fallbackKey));
+  renderSelectedSongPractice(sections, sections ? [] : tokens);
   if (!tokens.length) {
     selectedSongChords.hidden = !hasMedia;
     updateAdminUi();
     return;
   }
 
+  let practiceDisplayIndex = 0;
   const renderChordButton = (entry, target, sectionKeyLabel = null) => {
     const token = chordEntryToken(entry);
     const parsed = parseChordToken(token);
@@ -4055,6 +4518,8 @@ function renderSelectedInspirationSong() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "selected-song-chord";
+    button.dataset.practiceIndex = String(practiceDisplayIndex);
+    practiceDisplayIndex += 1;
     button.classList.toggle("no-chord", Boolean(parsed.noChord));
     button.classList.toggle("has-bass-note", Boolean(parsed.bass));
     button.classList.toggle("outside-scale", !fitsScale);
@@ -4364,11 +4829,14 @@ async function handleSaveSongSchemaEdits() {
 }
 
 function setActivePage(page) {
+  if (page !== "chords" && songPracticeState.playing) stopSelectedSongPractice();
+  if (page !== "ear" && earTrainingState.current) resetAudioContext();
   pageTabs.forEach((item) => item.classList.toggle("active", item.dataset.page === page));
   mobilePageMenuItems.forEach((item) => item.classList.toggle("active", item.dataset.page === page));
   pageViews.forEach((view) => view.classList.toggle("active", view.dataset.pageView === page));
   appShell.classList.toggle("song-mode", page === "song");
   appShell.classList.toggle("custom-mode", page === "custom");
+  appShell.classList.toggle("ear-mode", page === "ear");
   mobilePageMenuButton?.setAttribute("aria-expanded", "false");
   if (mobilePageMenu) mobilePageMenu.hidden = true;
   appTitle.classList.add("brand-title", "brand-title-logo");
@@ -4400,6 +4868,7 @@ async function loadInspirationSongFile(song) {
 }
 
 async function selectInspirationSong(card, song, libraryLabel = null) {
+  stopSelectedSongPractice();
   const label = libraryLabel || currentSongLibraryLabel();
   const selectedSong = songWithLibraryKey(song, label);
   state.selectedInspirationSong = selectedSong;
@@ -4473,11 +4942,14 @@ async function songFromAddForm() {
   const title = addSongTitle.value.trim();
   const artist = addSongArtist.value.trim();
   const media = await saveSongMediaFile(addSongMedia?.files?.[0], { title, artist });
+  const importedBpm = Number(String(imported?.bpm || "").match(/\d+(?:\.\d+)?/)?.[0]);
+  const bpm = Math.max(40, Math.min(220, Number(addSongBpm?.value) || importedBpm || 84));
   return {
     title,
     artist,
     style: addSongStyle.value.trim(),
     year: addSongYear.value.trim(),
+    bpm,
     level: addSongLevel.value.trim(),
     image: addSongImage.value.trim(),
     youtube: addSongYoutube.value.trim(),
@@ -5276,6 +5748,7 @@ function clearChordSequence() {
 }
 
 function clearSelectedInspirationSong() {
+  stopSelectedSongPractice();
   state.selectedInspirationSong = null;
   state.selectedSongTransposeKey = null;
   state.selectedModulationChord = null;
@@ -5329,11 +5802,16 @@ function renderChordSequence() {
       const options = sequenceInversionOptions(chord);
       const currentIndex = options.findIndex((option) => Number(option.value) === chord.inversion);
       const nextOption = options[(currentIndex + 1 + options.length) % options.length] || options[0];
-      const nextSequence = state.chordSequence.map((item, itemIndex) => (
-        itemIndex === index
-          ? { ...item, manualInversion: Number(nextOption.value) }
-          : item
-      ));
+      const nextSequence = state.chordSequence.map((item, itemIndex) => {
+        if (itemIndex === index) {
+          return { ...item, manualInversion: Number(nextOption.value) };
+        }
+        if (itemIndex > index) {
+          const { manualInversion, ...automaticItem } = item;
+          return automaticItem;
+        }
+        return item;
+      });
       state.chordSequence = rebuildChordSequence(nextSequence);
       applyDegreeChord({ ...chord, inversion: Number(nextOption.value) }, {
         record: false,
@@ -5696,6 +6174,11 @@ function renderFifthsCircle() {
   const activeIndex = fifthsCircle.findIndex((item) => item.aliases.includes(state.key.label));
   const activeAngle = -90 + activeIndex * 30;
   const arrowEnd = polarPoint(center, 58, activeAngle);
+  const previousArrowAngle = fifthsArrowAngle;
+  const arrowDelta = previousArrowAngle == null
+    ? 0
+    : mod(activeAngle - previousArrowAngle + 180, 360) - 180;
+  fifthsArrowAngle = activeAngle;
 
   fifthsCircleSvg.innerHTML = "";
   circleKeyLabel.innerHTML = `${formatMusicText(state.key.label)} ${state.scale.name}`;
@@ -5742,14 +6225,26 @@ function renderFifthsCircle() {
     }));
   });
 
-  fifthsCircleSvg.append(svgEl("line", {
+  const arrow = svgEl("line", {
     class: "circle-arrow",
     x1: center,
     y1: center,
     x2: arrowEnd.x,
     y2: arrowEnd.y,
     "marker-end": "url(#arrowHead)"
-  }));
+  });
+  if (previousArrowAngle != null && arrowDelta !== 0) {
+    arrow.style.transition = "none";
+    arrow.style.transform = `rotate(${-arrowDelta}deg)`;
+  }
+  fifthsCircleSvg.append(arrow);
+  if (previousArrowAngle != null && arrowDelta !== 0) {
+    arrow.getBoundingClientRect();
+    window.requestAnimationFrame(() => {
+      arrow.style.transition = "";
+      arrow.style.transform = "rotate(0deg)";
+    });
+  }
   fifthsCircleSvg.append(svgEl("circle", { class: "circle-center", cx: center, cy: center, r: 18 }));
 
   fifthsCircle.forEach((item, index) => {
@@ -5822,9 +6317,9 @@ function renderGrid() {
   });
 }
 
-function playNotes(notes) {
+async function playNotes(notes) {
   if (!isSongPlaying) resetAudioContext();
-  const context = getAudioContext();
+  const context = await pianoContextForPlayback();
   const now = context.currentTime + 0.03;
   notes.forEach((note, index) => {
     const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute));
@@ -5838,6 +6333,715 @@ function playNotesAt(notes, startTime, duration = 1.35) {
     const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute));
     playPianoTone(context, frequency, startTime + index * 0.024, Math.max(1.1, duration * 1.35), 0.17);
   });
+}
+
+function earTrainingQualityPool() {
+  return ["maj", "min"]
+    .map((id) => qualities.find((quality) => quality.id === id))
+    .filter(Boolean);
+}
+
+function earTrainingFourChordPool() {
+  const major = qualities.find((quality) => quality.id === "maj");
+  const minor = qualities.find((quality) => quality.id === "min");
+  return [
+    { id: "C", label: "C", rootLabel: "C", quality: major },
+    { id: "Am", label: "Am", rootLabel: "A", quality: minor },
+    { id: "F", label: "F", rootLabel: "F", quality: major },
+    { id: "G", label: "G", rootLabel: "G", quality: major }
+  ].map((item) => ({
+    ...item,
+    root: rootOptions.find((root) => root.label === item.rootLabel)
+  })).filter((item) => item.root && item.quality);
+}
+
+function earTrainingBassPool() {
+  return earTrainingFourChordPool().map((item) => ({
+    id: item.root.label,
+    label: item.root.label,
+    root: item.root,
+    quality: item.quality,
+    inversion: 0,
+    bassOnly: true,
+    playbackNotes: [{
+      pitch: item.root.pitch,
+      absolute: item.root.pitch - 12,
+      degree: "bass",
+      label: item.root.label,
+      bass: true
+    }]
+  }));
+}
+
+function earTrainingFunctionPool(keyLabel = "C") {
+  const scale = majorScaleForKeyLabel(keyLabel);
+  const major = qualities.find((quality) => quality.id === "maj");
+  const minor = qualities.find((quality) => quality.id === "min");
+  return [
+    { id: "I", scaleIndex: 0, quality: major },
+    { id: "IV", scaleIndex: 3, quality: major },
+    { id: "V", scaleIndex: 4, quality: major },
+    { id: "vi", scaleIndex: 5, quality: minor }
+  ].map((item) => {
+    const scaleNote = scale.notes[item.scaleIndex];
+    const root = rootOptions.find((option) => option.label === scaleNote.label)
+      || rootOptions.find((option) => option.pitch === scaleNote.pitch);
+    return {
+      ...item,
+      root,
+      label: item.id,
+      chordLabel: root && item.quality ? chordSymbol(root, item.quality) : "",
+      keyLabel
+    };
+  }).filter((item) => item.root && item.quality);
+}
+
+function earTrainingScalePlaybackNotes(keyLabel) {
+  const scale = majorScaleForKeyLabel(keyLabel);
+  if (!scale.notes.length) return [];
+  const notes = scale.notes.map((note) => ({ ...note, absolute: note.absolute - 12, bass: false }));
+  return [
+    ...notes,
+    { ...notes[0], absolute: notes[0].absolute + 12 }
+  ];
+}
+
+function earTrainingChordFromId(id) {
+  return earTrainingFourChordPool().find((item) => item.id === id) || null;
+}
+
+function earTrainingSequenceFromIds(ids) {
+  let previousNotes = null;
+  const exercises = ids.map((id) => earTrainingChordFromId(id)).filter(Boolean).map((item) => {
+    const parsed = { root: item.root, quality: item.quality };
+    const voicing = sequenceVoicing(parsed, previousNotes);
+    previousNotes = voicing.notes;
+    return {
+      ...item,
+      inversion: voicing.inversion,
+      voicing,
+      playbackNotes: songPlaybackNotes(parsed, voicing.notes, { includeBass: true })
+    };
+  });
+  return { ids, exercises };
+}
+
+function randomEarTrainingSequence(length) {
+  const ids = ["C", "Am", "F", "G"];
+  const result = [];
+  while (result.length < length) {
+    const choices = ids.filter((id) => id !== result[result.length - 1]);
+    result.push(choices[Math.floor(Math.random() * choices.length)]);
+  }
+  return result;
+}
+
+function earTrainingSequenceOptions(correctIds) {
+  const options = new Map();
+  const add = (ids) => options.set(ids.join("|"), { id: ids.join("|"), label: ids.join(" – ") });
+  add(correctIds);
+  let attempts = 0;
+  while (options.size < 4 && attempts < 40) {
+    add(randomEarTrainingSequence(correctIds.length));
+    attempts += 1;
+  }
+  return shuffledEarTrainingItems([...options.values()]);
+}
+
+function earTrainingFunctionKey() {
+  if (earTrainingState.difficulty === 1) return "C";
+  const keys = earTrainingState.difficulty === 2 ? ["C", "G", "F"] : ["C", "G", "D", "F", "Bb"];
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
+function earTrainingQualityLabel(quality) {
+  const labels = {
+    maj: "Majeur",
+    min: "Mineur",
+    dim: "Verminderd",
+    aug: "Overmatig",
+    sus2: "Sus2",
+    sus4: "Sus4",
+    "7": "Dominant 7",
+    maj7: "Majeur 7",
+    min7: "Mineur 7",
+    m7b5: "Halfverminderd",
+    dim7: "Verminderd 7",
+    "6": "Majeur 6",
+    min6: "Mineur 6"
+  };
+  return labels[quality?.id] || quality?.name || "Akkoord";
+}
+
+function shuffledEarTrainingItems(items) {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+}
+
+const earTrainingRecordStorageKey = "nootstudioEarTrainingRecords";
+const earTrainingDailyStorageKey = "nootstudioEarTrainingDaily";
+
+function earTrainingMode() {
+  const mode = earTrainingLevel?.value || "major-minor";
+  return ["major-minor", "four-chords", "bass-root", "chord-function", "sequence-memory", "missing-chord"].includes(mode)
+    ? mode
+    : "major-minor";
+}
+
+function earTrainingToday() {
+  const today = new Date();
+  return [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
+}
+
+function storedEarTrainingJson(key, fallback = {}) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || "null") || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function earTrainingBestForMode(mode = earTrainingMode()) {
+  return Number(storedEarTrainingJson(earTrainingRecordStorageKey)[mode] || 0);
+}
+
+function saveEarTrainingBest() {
+  const records = storedEarTrainingJson(earTrainingRecordStorageKey);
+  records[earTrainingMode()] = Math.max(Number(records[earTrainingMode()] || 0), earTrainingState.score);
+  try {
+    localStorage.setItem(earTrainingRecordStorageKey, JSON.stringify(records));
+  } catch {
+    // Het record blijft tijdens deze sessie beschikbaar als browseropslag niet is toegestaan.
+  }
+  earTrainingState.best = records[earTrainingMode()];
+}
+
+function earTrainingDifficultyLabel() {
+  if (earTrainingState.difficulty >= 3) return "Niveau: uitdaging";
+  if (earTrainingState.difficulty === 2) return "Niveau: groeiend";
+  return "Niveau: rustig";
+}
+
+function updateEarTrainingDailyStatus() {
+  if (!earTrainingDailyStatus) return;
+  const daily = storedEarTrainingJson(earTrainingDailyStorageKey);
+  if (daily.date === earTrainingToday()) {
+    earTrainingDailyStatus.textContent = `Vandaag voltooid · ${Number(daily.score || 0)} punten`;
+    earTrainingDailyStatus.classList.add("is-complete");
+  } else {
+    earTrainingDailyStatus.textContent = "Dagtraining · 5 vragen";
+    earTrainingDailyStatus.classList.remove("is-complete");
+  }
+}
+
+function updateEarTrainingStats() {
+  const progress = Math.min(earTrainingState.total, earTrainingState.roundSize);
+  if (earTrainingScore) earTrainingScore.textContent = String(earTrainingState.score);
+  if (earTrainingStreak) earTrainingStreak.textContent = String(earTrainingState.streak);
+  if (earTrainingLives) {
+    const fullLives = "♥ ".repeat(earTrainingState.lives);
+    const emptyLives = "♡ ".repeat(Math.max(0, 3 - earTrainingState.lives));
+    earTrainingLives.textContent = `${fullLives}${emptyLives}`.trim();
+    earTrainingLives.setAttribute("aria-label", `${earTrainingState.lives} ${earTrainingState.lives === 1 ? "leven" : "levens"}`);
+  }
+  if (earTrainingBest) earTrainingBest.textContent = String(Math.max(earTrainingState.best, earTrainingState.score));
+  if (earTrainingDifficulty) earTrainingDifficulty.textContent = earTrainingDifficultyLabel();
+  if (earTrainingProgressText) earTrainingProgressText.textContent = `${progress} van ${earTrainingState.roundSize}`;
+  if (earTrainingProgressFill) earTrainingProgressFill.style.width = `${(progress / earTrainingState.roundSize) * 100}%`;
+  if (earTrainingProgress) earTrainingProgress.setAttribute("aria-valuenow", String(progress));
+  updateEarTrainingDailyStatus();
+}
+
+function earTrainingPlaybackData(exercise) {
+  if (!exercise) return null;
+  if (Array.isArray(exercise.playbackNotes) && exercise.playbackNotes.length) {
+    return { voicing: exercise.voicing || null, notes: exercise.playbackNotes };
+  }
+  const parsed = { root: exercise.root, quality: exercise.quality };
+  const inversion = Math.min(exercise.inversion, parsed.quality.intervals.length - 1);
+  const targetCenter = earTrainingState.difficulty >= 3 ? 9 : 7;
+  const voicing = bestVoicing(parsed, null, targetCenter, inversion);
+  return {
+    voicing,
+    notes: songPlaybackNotes(parsed, voicing.notes, { includeBass: true })
+  };
+}
+
+function scheduleEarTrainingExercise(context, exercise, startTime, options = {}) {
+  const includeIntro = options.includeIntro !== false;
+  const introNotes = includeIntro && Array.isArray(exercise?.introPlaybackNotes)
+    ? exercise.introPlaybackNotes
+    : [];
+  const introStep = 0.38;
+  const introDuration = introNotes.length ? (introNotes.length - 1) * introStep + 0.37 : 0;
+  const mainStart = startTime + introDuration + (introNotes.length ? 0.5 : 0);
+  introNotes.forEach((note, noteIndex) => {
+    const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute));
+    playPianoTone(
+      context,
+      frequency,
+      startTime + noteIndex * introStep,
+      0.3,
+      0.16,
+      { minimumDuration: 0.3, releaseDuration: 0.07 }
+    );
+  });
+  const noteGroups = Array.isArray(exercise?.sequencePlaybackNotes) && exercise.sequencePlaybackNotes.length
+    ? exercise.sequencePlaybackNotes
+    : [earTrainingPlaybackData(exercise)?.notes || []];
+  const spacing = exercise?.bassOnly ? 1.25 : 1.55;
+  noteGroups.forEach((notes, groupIndex) => {
+    notes.forEach((note, noteIndex) => {
+      const frequency = frequencyFromMidi(midiFromAbsolutePitch(note.absolute));
+      playPianoTone(context, frequency, mainStart + groupIndex * spacing + noteIndex * 0.024, 1.9, 0.17);
+    });
+  });
+  const mainDuration = Math.max(1.35, (noteGroups.length - 1) * spacing + 1.9);
+  return mainStart - startTime + mainDuration;
+}
+
+async function playEarTrainingChord(exercise = earTrainingState.current) {
+  if (!exercise) return;
+  const context = await pianoContextForPlayback();
+  scheduleEarTrainingExercise(context, exercise, context.currentTime + 0.03);
+  earTrainingListen?.classList.remove("is-playing");
+  window.requestAnimationFrame(() => earTrainingListen?.classList.add("is-playing"));
+  window.setTimeout(() => earTrainingListen?.classList.remove("is-playing"), 500);
+}
+
+function renderEarTrainingAnswers(options) {
+  if (!earTrainingAnswers) return;
+  earTrainingAnswers.innerHTML = "";
+  options.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.answerId = option.id;
+    button.textContent = option.label;
+    button.addEventListener("click", () => answerEarTrainingQuestion(option.id));
+    earTrainingAnswers.append(button);
+  });
+}
+
+function nextEarTrainingQuestion() {
+  if (!earTrainingState.started || earTrainingState.roundComplete) {
+    startEarTrainingRound();
+  }
+  if (earTrainingState.total >= earTrainingState.roundSize || earTrainingState.lives <= 0) {
+    finishEarTrainingRound();
+    return;
+  }
+  const mode = earTrainingMode();
+  let root;
+  let quality;
+  let answerId;
+  let answerOptions;
+  let signature;
+  let prompt = "";
+  let hint = "";
+  let keyLabel = "";
+  let sequenceIds = null;
+  let presetPlaybackNotes = null;
+  let bassOnly = false;
+  if (mode === "four-chords") {
+    const pool = earTrainingFourChordPool();
+    if (!pool.length) return;
+    let selected = pool[0];
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      selected = pool[Math.floor(Math.random() * pool.length)];
+      signature = `four-chords|${selected.id}`;
+      if (signature !== earTrainingState.lastSignature) break;
+    }
+    root = selected.root;
+    quality = selected.quality;
+    answerId = selected.id;
+    answerOptions = pool.map((item) => ({ id: item.id, label: item.label }));
+    prompt = "Hoor je C, Am, F of G?";
+    hint = "Luister naar het hele akkoord en kies daarna C, Am, F of G.";
+  } else if (mode === "bass-root") {
+    const pool = earTrainingBassPool();
+    let selected = pool[0];
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      selected = pool[Math.floor(Math.random() * pool.length)];
+      signature = `bass-root|${selected.id}`;
+      if (signature !== earTrainingState.lastSignature) break;
+    }
+    root = selected.root;
+    quality = selected.quality;
+    answerId = selected.id;
+    answerOptions = shuffledEarTrainingItems(pool.map((item) => ({ id: item.id, label: item.label })));
+    presetPlaybackNotes = selected.playbackNotes;
+    bassOnly = true;
+    prompt = "Welke grondtoon hoor je?";
+    hint = "Je hoort alleen de lage basnoot. Kies C, A, F of G.";
+  } else if (mode === "chord-function") {
+    keyLabel = earTrainingFunctionKey();
+    const pool = earTrainingFunctionPool(keyLabel);
+    let selected = pool[0];
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      selected = pool[Math.floor(Math.random() * pool.length)];
+      signature = `chord-function|${keyLabel}|${selected.id}`;
+      if (signature !== earTrainingState.lastSignature) break;
+    }
+    root = selected.root;
+    quality = selected.quality;
+    answerId = selected.id;
+    answerOptions = pool.map((item) => ({ id: item.id, label: item.label }));
+    prompt = `Welke functie hoor je in ${keyLabel} majeur?`;
+    hint = "Luister eerst naar de toonladder en daarna naar het akkoord. Kies vervolgens I, IV, V of vi.";
+  } else if (mode === "sequence-memory") {
+    const length = earTrainingState.difficulty === 1 ? 2 : 3;
+    sequenceIds = randomEarTrainingSequence(length);
+    const first = earTrainingChordFromId(sequenceIds[0]);
+    root = first.root;
+    quality = first.quality;
+    answerId = sequenceIds.join("|");
+    answerOptions = earTrainingSequenceOptions(sequenceIds);
+    signature = `sequence-memory|${answerId}`;
+    prompt = `Welke volgorde hoorde je? (${length} akkoorden)`;
+    hint = "Onthoud de volgorde en kies daarna de juiste akkoordenreeks.";
+  } else if (mode === "missing-chord") {
+    const progressions = [
+      ["C", "Am", "F", "G"],
+      ["C", "G", "Am", "F"],
+      ["Am", "F", "C", "G"],
+      ["F", "G", "C", "Am"]
+    ];
+    sequenceIds = progressions[Math.floor(Math.random() * progressions.length)];
+    const hiddenChoices = earTrainingState.difficulty === 1 ? [1, 2] : [0, 1, 2, 3];
+    const hiddenIndex = hiddenChoices[Math.floor(Math.random() * hiddenChoices.length)];
+    const missing = earTrainingChordFromId(sequenceIds[hiddenIndex]);
+    root = missing.root;
+    quality = missing.quality;
+    answerId = missing.id;
+    answerOptions = shuffledEarTrainingItems(earTrainingFourChordPool().map((item) => ({ id: item.id, label: item.label })));
+    signature = `missing-chord|${sequenceIds.join("|")}|${hiddenIndex}`;
+    prompt = `Welk akkoord ontbreekt? ${sequenceIds.map((id, index) => index === hiddenIndex ? "?" : id).join(" – ")}`;
+    hint = "Luister naar de volledige reeks en vul het ontbrekende akkoord in.";
+  } else {
+    const pool = earTrainingQualityPool();
+    if (!pool.length) return;
+    const rootLabels = earTrainingState.difficulty === 1
+      ? ["C", "D", "E", "F", "G", "A", "B"]
+      : chromaticLabels;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const rootLabel = rootLabels[Math.floor(Math.random() * rootLabels.length)];
+      root = rootOptions.find((option) => option.label === rootLabel) || rootOptions[0];
+      quality = pool[Math.floor(Math.random() * pool.length)];
+      signature = `${root.label}|${quality.id}`;
+      if (signature !== earTrainingState.lastSignature) break;
+    }
+    answerId = quality.id;
+    answerOptions = shuffledEarTrainingItems(pool.map((item) => ({
+      id: item.id,
+      label: earTrainingQualityLabel(item)
+    })));
+    prompt = "Hoor je majeur of mineur?";
+    hint = "Luister rustig en kies daarna majeur of mineur.";
+  }
+  const inversionLimit = mode === "bass-root" ? 1 : (earTrainingState.difficulty === 1 ? 2 : 3);
+  const inversionCount = Math.min(inversionLimit, quality.intervals.length);
+  let inversion = Math.floor(Math.random() * inversionCount);
+  if (inversionCount > 1 && inversion === earTrainingState.lastInversion) {
+    inversion = (inversion + 1 + Math.floor(Math.random() * (inversionCount - 1))) % inversionCount;
+  }
+  earTrainingState.lastInversion = inversion;
+  earTrainingState.lastSignature = signature;
+  earTrainingState.current = { root, quality, answerId, mode, inversion, keyLabel, sequenceIds, bassOnly };
+  if (mode === "chord-function") {
+    earTrainingState.current.introPlaybackNotes = earTrainingScalePlaybackNotes(keyLabel);
+  }
+  if (presetPlaybackNotes) earTrainingState.current.playbackNotes = presetPlaybackNotes;
+  const originalPlayback = earTrainingPlaybackData(earTrainingState.current);
+  earTrainingState.current.voicing = originalPlayback.voicing;
+  earTrainingState.current.playbackNotes = originalPlayback.notes;
+  if (sequenceIds) {
+    const sequence = earTrainingSequenceFromIds(sequenceIds);
+    earTrainingState.current.sequenceExercises = sequence.exercises;
+    earTrainingState.current.sequencePlaybackNotes = sequence.exercises.map((item) => item.playbackNotes);
+  }
+  earTrainingState.selectedAnswerId = "";
+  earTrainingState.answered = false;
+  earTrainingState.started = true;
+  earTrainingState.roundComplete = false;
+  hideEarTrainingReveal();
+  renderEarTrainingAnswers(answerOptions);
+  if (earTrainingQuestion) {
+    earTrainingQuestion.textContent = `Vraag ${earTrainingState.total + 1} van ${earTrainingState.roundSize} - ${prompt}`;
+  }
+  if (earTrainingFeedback) {
+    earTrainingFeedback.textContent = hint;
+    earTrainingFeedback.className = "ear-training-feedback";
+  }
+  if (earTrainingNext) {
+    earTrainingNext.textContent = "Volgende vraag";
+    earTrainingNext.hidden = true;
+  }
+  if (earTrainingListen) earTrainingListen.disabled = false;
+  updateEarTrainingStats();
+  playEarTrainingChord();
+}
+
+function earTrainingExerciseForAnswer(answerId) {
+  const current = earTrainingState.current;
+  if (!current) return null;
+  if (current.mode === "four-chords" || current.mode === "missing-chord") {
+    const selected = earTrainingFourChordPool().find((item) => item.id === answerId);
+    return selected ? { ...selected, inversion: current.inversion } : null;
+  }
+  if (current.mode === "bass-root") {
+    const selected = earTrainingBassPool().find((item) => item.id === answerId);
+    return selected ? { ...selected, inversion: 0, bassOnly: true } : null;
+  }
+  if (current.mode === "chord-function") {
+    const selected = earTrainingFunctionPool(current.keyLabel).find((item) => item.id === answerId);
+    return selected ? { ...selected, inversion: current.inversion } : null;
+  }
+  if (current.mode === "sequence-memory") {
+    const sequenceIds = answerId.split("|");
+    const sequence = earTrainingSequenceFromIds(sequenceIds);
+    const first = sequence.exercises[0];
+    if (!first) return null;
+    return {
+      ...first,
+      sequenceIds,
+      sequenceExercises: sequence.exercises,
+      sequencePlaybackNotes: sequence.exercises.map((item) => item.playbackNotes)
+    };
+  }
+  const quality = qualities.find((item) => item.id === answerId);
+  return quality ? { root: current.root, quality, inversion: current.inversion } : null;
+}
+
+function hideEarTrainingReveal() {
+  if (earTrainingState.revealTimer) window.clearTimeout(earTrainingState.revealTimer);
+  earTrainingState.revealTimer = null;
+  if (earTrainingReveal) earTrainingReveal.hidden = true;
+  if (earTrainingRevealKeyboard) earTrainingRevealKeyboard.innerHTML = "";
+  if (earTrainingRevealStaff) earTrainingRevealStaff.innerHTML = "";
+  if (earTrainingCompare) earTrainingCompare.disabled = false;
+}
+
+function showEarTrainingCorrection() {
+  const exercise = earTrainingState.current;
+  if (!exercise) return;
+  const playback = earTrainingPlaybackData(exercise);
+  const symbol = chordSymbol(exercise.root, exercise.quality);
+  earTrainingAnswers?.querySelectorAll("button").forEach((button) => {
+    button.classList.toggle("is-correct", button.dataset.answerId === exercise.answerId);
+  });
+  if (earTrainingRevealTitle) {
+    if (exercise.mode === "bass-root") {
+      earTrainingRevealTitle.innerHTML = `Dit is de grondtoon <strong>${formatMusicText(exercise.root.label)}</strong>.`;
+    } else if (exercise.mode === "chord-function") {
+      earTrainingRevealTitle.innerHTML = `Dit is de <strong>${formatMusicText(exercise.answerId)}-trap</strong>: ${formatMusicText(symbol)} in ${formatMusicText(exercise.keyLabel)} majeur.`;
+    } else if (exercise.mode === "sequence-memory") {
+      earTrainingRevealTitle.innerHTML = `Juiste volgorde: <strong>${formatMusicText(exercise.sequenceIds.join(" – "))}</strong>.`;
+    } else if (exercise.mode === "missing-chord") {
+      earTrainingRevealTitle.innerHTML = `Het ontbrekende akkoord is <strong>${formatMusicText(symbol)}</strong>.`;
+    } else {
+      earTrainingRevealTitle.innerHTML = `Dit is <strong>${formatMusicText(symbol)}</strong>. Bekijk en beluister het akkoord.`;
+    }
+  }
+  if (earTrainingRevealKeyboard) {
+    earTrainingRevealKeyboard.innerHTML = miniKeyboardHtml(playback.notes, false, { height: 58, whiteLabelY: 49, blackLabelY: 27 });
+  }
+  if (earTrainingRevealStaff) {
+    const staffNotes = exercise.mode === "bass-root"
+      ? playback.notes.map((note) => ({ ...note, absolute: note.absolute + 12, bass: false }))
+      : playback.notes.filter((note) => !note.bass);
+    earTrainingRevealStaff.dataset.notes = staffNotes.map((note) => note.absolute).join(",");
+    earTrainingRevealStaff.dataset.labels = staffNotes.map((note) => note.label).join(",");
+    earTrainingRevealStaff.dataset.duration = "w";
+    earTrainingRevealStaff.dataset.dots = "0";
+    earTrainingRevealStaff.dataset.clef = "true";
+    renderChordNotation(earTrainingRevealStaff);
+  }
+  if (earTrainingReveal) earTrainingReveal.hidden = false;
+  finishOrContinueEarTrainingRound();
+}
+
+function adaptEarTrainingDifficulty(correct) {
+  if (!correct) {
+    earTrainingState.difficulty = Math.max(1, earTrainingState.difficulty - 1);
+    earTrainingState.correctAtDifficulty = 0;
+    return;
+  }
+  earTrainingState.correctAtDifficulty += 1;
+  if (earTrainingState.correctAtDifficulty >= 2 && earTrainingState.difficulty < 3) {
+    earTrainingState.difficulty += 1;
+    earTrainingState.correctAtDifficulty = 0;
+  }
+}
+
+function finishOrContinueEarTrainingRound() {
+  if (earTrainingState.total >= earTrainingState.roundSize || earTrainingState.lives <= 0) {
+    finishEarTrainingRound();
+    return;
+  }
+  if (earTrainingNext) {
+    earTrainingNext.hidden = false;
+    earTrainingNext.textContent = "Volgende vraag";
+  }
+}
+
+function finishEarTrainingRound() {
+  earTrainingState.roundComplete = true;
+  saveEarTrainingBest();
+  if (earTrainingState.total >= earTrainingState.roundSize) {
+    try {
+      localStorage.setItem(earTrainingDailyStorageKey, JSON.stringify({
+        date: earTrainingToday(),
+        score: earTrainingState.score,
+        correct: earTrainingState.correct,
+        mode: earTrainingMode()
+      }));
+    } catch {
+      // De voltooide dagtraining blijft zichtbaar tot de pagina wordt vernieuwd.
+    }
+  }
+  if (earTrainingQuestion) {
+    earTrainingQuestion.textContent = earTrainingState.lives > 0
+      ? `Ronde voltooid: ${earTrainingState.correct} van ${earTrainingState.roundSize} goed`
+      : `Ronde afgelopen: ${earTrainingState.correct} goed`;
+  }
+  if (earTrainingFeedback) {
+    earTrainingFeedback.innerHTML = `Je behaalde <strong>${earTrainingState.score} punten</strong>. Persoonlijk record: ${earTrainingState.best}.`;
+    earTrainingFeedback.className = "ear-training-feedback";
+  }
+  if (earTrainingListen) earTrainingListen.disabled = true;
+  if (earTrainingNext) {
+    earTrainingNext.hidden = false;
+    earTrainingNext.textContent = "Nieuwe ronde";
+  }
+  updateEarTrainingStats();
+}
+
+async function playEarTrainingComparison() {
+  const chosen = earTrainingExerciseForAnswer(earTrainingState.selectedAnswerId);
+  const correct = earTrainingState.current;
+  if (!chosen || !correct || !earTrainingCompare) return;
+  earTrainingCompare.disabled = true;
+  const context = await pianoContextForPlayback();
+  const start = context.currentTime + 0.05;
+  const chosenDuration = scheduleEarTrainingExercise(context, chosen, start, { includeIntro: false });
+  const pause = 0.55;
+  const correctDuration = scheduleEarTrainingExercise(context, correct, start + chosenDuration + pause, { includeIntro: false });
+  window.setTimeout(() => {
+    if (earTrainingCompare) earTrainingCompare.disabled = false;
+  }, (chosenDuration + pause + correctDuration + 0.2) * 1000);
+}
+
+function earTrainingReplayDelay(exercise) {
+  if (Array.isArray(exercise?.introPlaybackNotes) && exercise.introPlaybackNotes.length) {
+    const introDuration = (exercise.introPlaybackNotes.length - 1) * 380 + 370;
+    return introDuration + 500 + 2150;
+  }
+  if (Array.isArray(exercise?.sequencePlaybackNotes) && exercise.sequencePlaybackNotes.length) {
+    return (exercise.sequencePlaybackNotes.length - 1) * 1550 + 2200;
+  }
+  return exercise?.bassOnly ? 1500 : 2400;
+}
+
+function answerEarTrainingQuestion(answerId) {
+  if (!earTrainingState.current || earTrainingState.answered) return;
+  earTrainingState.answered = true;
+  earTrainingState.selectedAnswerId = answerId;
+  earTrainingState.total += 1;
+  const correctId = earTrainingState.current.answerId;
+  const correct = answerId === correctId;
+  if (correct) {
+    earTrainingState.streak += 1;
+    earTrainingState.correct += 1;
+    earTrainingState.score += 100 + (earTrainingState.streak - 1) * 25 + (earTrainingState.difficulty - 1) * 25;
+  } else {
+    earTrainingState.streak = 0;
+    earTrainingState.lives = Math.max(0, earTrainingState.lives - 1);
+  }
+  adaptEarTrainingDifficulty(correct);
+  updateEarTrainingStats();
+  earTrainingAnswers?.querySelectorAll("button").forEach((button) => {
+    button.disabled = true;
+    button.classList.toggle("is-correct", correct && button.dataset.answerId === correctId);
+    button.classList.toggle("is-wrong", button.dataset.answerId === answerId && !correct);
+  });
+  const symbol = chordSymbol(earTrainingState.current.root, earTrainingState.current.quality);
+  const inversion = voicingLabel(earTrainingState.current.inversion);
+  const bassLabel = earTrainingState.current.root.label;
+  const playbackDetail = `${formatMusicText(inversion)}, met ${formatMusicText(bassLabel)} in de bas`;
+  if (earTrainingFeedback) {
+    if (!correct) {
+      earTrainingFeedback.textContent = "Nog niet. Luister eerst nog één keer; daarna zie je het juiste antwoord.";
+    } else if (earTrainingState.current.mode === "bass-root") {
+      earTrainingFeedback.innerHTML = `Goed gehoord! De grondtoon was <strong>${formatMusicText(earTrainingState.current.root.label)}</strong>.`;
+    } else if (earTrainingState.current.mode === "chord-function") {
+      earTrainingFeedback.innerHTML = `Goed gehoord! Dit was de <strong>${formatMusicText(earTrainingState.current.answerId)}-trap</strong>: ${formatMusicText(symbol)} in ${formatMusicText(earTrainingState.current.keyLabel)} majeur.`;
+    } else if (earTrainingState.current.mode === "sequence-memory") {
+      earTrainingFeedback.innerHTML = `Goed onthouden! De volgorde was <strong>${formatMusicText(earTrainingState.current.sequenceIds.join(" – "))}</strong>.`;
+    } else if (earTrainingState.current.mode === "missing-chord") {
+      earTrainingFeedback.innerHTML = `Goed gehoord! Het ontbrekende akkoord was <strong>${formatMusicText(symbol)}</strong>.`;
+    } else if (earTrainingState.current.mode === "four-chords") {
+      earTrainingFeedback.innerHTML = `Goed gehoord! Dit was <strong>${formatMusicText(symbol)}</strong> (${playbackDetail}).`;
+    } else {
+      earTrainingFeedback.innerHTML = `Goed gehoord! Dit was <strong>${formatMusicText(symbol)}</strong>, een ${formatMusicText(earTrainingQualityLabel(earTrainingState.current.quality).toLowerCase())} akkoord (${playbackDetail}).`;
+    }
+    earTrainingFeedback.classList.toggle("is-correct", correct);
+    earTrainingFeedback.classList.toggle("is-wrong", !correct);
+  }
+  if (correct) {
+    finishOrContinueEarTrainingRound();
+  } else {
+    if (earTrainingNext) earTrainingNext.hidden = true;
+    const question = earTrainingState.current;
+    const revealCorrection = () => {
+      if (earTrainingState.current !== question) return;
+      earTrainingState.revealTimer = window.setTimeout(() => {
+        if (earTrainingState.current === question) showEarTrainingCorrection();
+      }, earTrainingReplayDelay(question));
+    };
+    Promise.resolve(playEarTrainingChord()).then(revealCorrection, revealCorrection);
+  }
+}
+
+function startEarTrainingRound() {
+  resetAudioContext();
+  hideEarTrainingReveal();
+  earTrainingState.current = null;
+  earTrainingState.score = 0;
+  earTrainingState.correct = 0;
+  earTrainingState.total = 0;
+  earTrainingState.streak = 0;
+  earTrainingState.lives = 3;
+  earTrainingState.best = earTrainingBestForMode();
+  earTrainingState.difficulty = 1;
+  earTrainingState.correctAtDifficulty = 0;
+  earTrainingState.roundComplete = false;
+  earTrainingState.selectedAnswerId = "";
+  earTrainingState.answered = false;
+  earTrainingState.started = true;
+  earTrainingState.lastSignature = "";
+  earTrainingState.lastInversion = -1;
+  updateEarTrainingStats();
+}
+
+function resetEarTraining() {
+  startEarTrainingRound();
+  earTrainingState.started = false;
+  updateEarTrainingStats();
+  if (earTrainingAnswers) earTrainingAnswers.innerHTML = "";
+  if (earTrainingQuestion) earTrainingQuestion.textContent = "Druk op start om te beginnen";
+  if (earTrainingFeedback) {
+    earTrainingFeedback.textContent = "";
+    earTrainingFeedback.className = "ear-training-feedback";
+  }
+  if (earTrainingListen) earTrainingListen.disabled = true;
+  if (earTrainingNext) {
+    earTrainingNext.hidden = false;
+    earTrainingNext.textContent = "Start training";
+  }
 }
 
 function miniKeyboardHtml(notes, showLabels = false, options = {}) {
@@ -6141,25 +7345,55 @@ function measureHasEnding(measure, number) {
   return measureEndingNumbers(measure).includes(String(number));
 }
 
-function expandedPartMeasures(part) {
-  if (!part?.measures?.length) return [];
-  const repeat = Math.max(1, Number(part.repeat || 1));
-  if (repeat <= 1) return part.measures;
+function measureAppliesToRepeatPass(measure, pass) {
+  const endings = measureEndingNumbers(measure).map(Number).filter(Number.isFinite);
+  return !endings.length || endings.includes(pass);
+}
 
-  const hasFirstEnding = part.measures.some((measure) => measureHasEnding(measure, "1"));
-  if (!hasFirstEnding) {
-    return Array.from({ length: repeat }, () => part.measures).flat();
+function repeatedMeasureIndexes(indexes, measures, repeatCount) {
+  const result = [];
+  for (let pass = 1; pass <= repeatCount; pass += 1) {
+    indexes.forEach((index) => {
+      if (measureAppliesToRepeatPass(measures[index], pass)) result.push(index);
+    });
+  }
+  return result;
+}
+
+function expandedPartMeasureIndexes(part) {
+  const measures = part?.measures || [];
+  if (!measures.length) return [];
+  const fallbackRepeat = Math.max(1, Number(part.repeat || 1));
+  const hasRepeatEnd = measures.some((measure) => Boolean(measure?.repeatEnd));
+  if (!hasRepeatEnd) {
+    const indexes = measures.map((_measure, index) => index);
+    return fallbackRepeat > 1
+      ? repeatedMeasureIndexes(indexes, measures, fallbackRepeat)
+      : indexes;
   }
 
-  const commonMeasures = part.measures.filter((measure) => !measureHasEnding(measure, "1") && !measureHasEnding(measure, "2"));
-  const firstEndingMeasures = part.measures.filter((measure) => measureHasEnding(measure, "1"));
-  const secondEndingMeasures = part.measures.filter((measure) => measureHasEnding(measure, "2"));
-  return [
-    ...commonMeasures,
-    ...firstEndingMeasures,
-    ...Array.from({ length: repeat - 1 }, () => commonMeasures).flat(),
-    ...secondEndingMeasures
-  ];
+  const result = [];
+  let plainStart = 0;
+  let repeatStart = null;
+  measures.forEach((measure, index) => {
+    if (measure?.repeatStart) repeatStart = index;
+    if (!measure?.repeatEnd) return;
+    const start = repeatStart ?? plainStart;
+    for (let before = plainStart; before < start; before += 1) result.push(before);
+    const region = Array.from({ length: index - start + 1 }, (_item, offset) => start + offset);
+    const wholePartRepeat = start === 0 && index === measures.length - 1 ? fallbackRepeat : 1;
+    const repeatCount = Math.max(2, Number(measure.repeatCount || 1), wholePartRepeat);
+    result.push(...repeatedMeasureIndexes(region, measures, repeatCount));
+    plainStart = index + 1;
+    repeatStart = null;
+  });
+  for (let index = plainStart; index < measures.length; index += 1) result.push(index);
+  return result;
+}
+
+function expandedPartMeasures(part) {
+  const measures = part?.measures || [];
+  return expandedPartMeasureIndexes(part).map((index) => measures[index]);
 }
 
 function markRepeatPartMeasures(part) {
@@ -7103,12 +8337,15 @@ function chordCardHtml(entry, previousNotes, scaleSet, playId, measure, chordInd
     }
     : songVoicing(parsed, previousNotes);
   const playbackNotes = notesWithBass(parsed, voicing.notes);
+  const audibleNotes = songPlaybackNotes(parsed, voicing.notes, {
+    includeBass: Boolean(parsed.bass)
+  });
   const outside = playbackNotes.some((note) => !scaleSet.has(note.pitch));
   const notationDuration = notationDurationForLength(chordQuarterLength(entry, measure));
   return {
     notes: voicing.notes,
     html: `
-      <button class="song-chord-card ${outside ? "" : "fits-scale"} ${parsed.bass ? "has-bass-note" : ""}" type="button" data-play-id="${playId}" data-token="${escapeHtml(token)}" data-notes="${playbackNotes.map((note) => note.absolute).join(",")}">
+      <button class="song-chord-card ${outside ? "" : "fits-scale"} ${parsed.bass ? "has-bass-note" : ""}" type="button" data-play-id="${playId}" data-token="${escapeHtml(token)}" data-notes="${playbackNotes.map((note) => note.absolute).join(",")}" data-playback-notes="${audibleNotes.map((note) => note.absolute).join(",")}">
         <strong>${formatMusicText(parsed.symbol)}</strong>
         ${miniKeyboardHtml(playbackNotes)}
         <span class="song-notation" data-notes="${playbackNotes.map((note) => note.absolute).join(",")}" data-labels="${playbackNotes.map((note) => note.label).join(",")}" data-duration="${notationDuration.duration}" data-dots="${notationDuration.dots}" data-measure-start="${chordIndex === 0 ? "true" : "false"}"></span>
@@ -7155,24 +8392,38 @@ function buildSongPlayback() {
   const events = [];
   let currentTime = 0;
   let previousNotes = null;
+  let nextCardIndex = 0;
 
   orderedSongEntries().forEach(({ section }) => {
-    expandedMeasures(section.importedParts || parseMeasures(section.chords)).forEach((measure) => {
-      measureEntriesFromMeasure(measure).forEach((entry, chordIndex) => {
-        const token = chordEntryToken(entry);
-        const chordDuration = beatDuration * chordBeatCount(entry, measure);
-        const parsed = parseChordToken(token);
-        if (parsed && !parsed.noChord) {
-          const voicing = songVoicing(parsed, previousNotes);
-          previousNotes = voicing.notes;
-          events.push({
-            notes: notesWithBass(parsed, voicing.notes),
-            time: currentTime,
-            duration: chordDuration,
-            cardIndex: events.length
-          });
-        }
-        currentTime += chordDuration;
+    const parts = section.importedParts || parseMeasures(section.chords);
+    parts.forEach((part) => {
+      const cardIndexes = part.measures.map((measure) => measureEntriesFromMeasure(measure).map((entry) => {
+        const parsed = parseChordToken(chordEntryToken(entry));
+        if (!parsed || parsed.noChord) return null;
+        const cardIndex = nextCardIndex;
+        nextCardIndex += 1;
+        return cardIndex;
+      }));
+      expandedPartMeasureIndexes(part).forEach((measureIndex) => {
+        const measure = part.measures[measureIndex];
+        measureEntriesFromMeasure(measure).forEach((entry, chordIndex) => {
+          const token = chordEntryToken(entry);
+          const chordDuration = beatDuration * chordBeatCount(entry, measure);
+          const parsed = parseChordToken(token);
+          if (parsed && !parsed.noChord) {
+            const voicing = songVoicing(parsed, previousNotes);
+            previousNotes = voicing.notes;
+            events.push({
+              notes: songPlaybackNotes(parsed, voicing.notes, {
+                includeBass: Boolean(parsed.bass)
+              }),
+              time: currentTime,
+              duration: chordDuration,
+              cardIndex: cardIndexes[measureIndex][chordIndex]
+            });
+          }
+          currentTime += chordDuration;
+        });
       });
     });
   });
@@ -7187,6 +8438,7 @@ function clearSongActiveCards() {
 }
 
 function stopSongPlayback() {
+  songPlaybackRunId += 1;
   songTimeouts.forEach((timeout) => window.clearTimeout(timeout));
   songTimeouts = [];
   resetAudioContext();
@@ -7197,14 +8449,17 @@ function stopSongPlayback() {
   document.querySelectorAll(".song-chord-card.played").forEach((card) => card.classList.remove("played"));
 }
 
-function startSongPlayback() {
+async function startSongPlayback() {
   stopSongPlayback();
   const events = buildSongPlayback();
   if (!events.length) return;
-  const context = getAudioContext();
-  const startAt = context.currentTime + 0.08;
+  const runId = songPlaybackRunId;
   isSongPlaying = true;
   songPlayButton.classList.add("playing");
+  songPlayButton.textContent = "Piano laden…";
+  const context = await pianoContextForPlayback();
+  if (songPlaybackRunId !== runId || !isSongPlaying) return;
+  const startAt = context.currentTime + 0.08;
   songPlayButton.textContent = "Stop";
 
   events.forEach((event) => {
@@ -7309,7 +8564,9 @@ function renderSongCards(section, grid, startMeasure = 1, showMeter = false) {
 
   grid.querySelectorAll(".song-chord-card[data-notes]").forEach((card) => {
     card.addEventListener("click", () => {
-      const notes = card.dataset.notes.split(",").map((absolute) => ({ absolute: Number(absolute) }));
+      const notes = (card.dataset.playbackNotes || card.dataset.notes)
+        .split(",")
+        .map((absolute) => ({ absolute: Number(absolute) }));
       playNotes(notes);
     });
   });
@@ -7481,10 +8738,10 @@ function render() {
   renderSong();
   renderCustomComposer();
   attachChordAutocomplete();
-  if (!state.chordActive && state.chordMode !== "search") {
+  focusActiveChordOnKeyboard();
+  if (shouldAutoFocusKeyboard()) {
     centerCurrentScaleOnKeyboard();
   }
-  focusActiveChordOnKeyboard();
 }
 
 rootSelect.addEventListener("change", () => {
@@ -7560,11 +8817,35 @@ searchChordSequence?.addEventListener("click", () => {
 });
 
 selectedSongTranspose?.addEventListener("change", () => {
+  stopSelectedSongPractice();
   const key = keyOptions[Number(selectedSongTranspose.value)];
   if (!key) return;
   applySelectedSongTransposeKey(key.label);
   render();
   scrollSelectedSongIntoView();
+});
+
+songPracticeToggle?.addEventListener("click", () => {
+  if (songPracticeState.playing) {
+    stopSelectedSongPractice();
+  } else {
+    startSelectedSongPractice();
+  }
+});
+
+songPracticeSection?.addEventListener("change", () => {
+  stopSelectedSongPractice();
+});
+
+songPracticeBpm?.addEventListener("change", () => {
+  songPracticeBpm.value = String(Math.max(40, Math.min(220, Number(songPracticeBpm.value) || 84)));
+  if (songPracticeState.playing) startSelectedSongPractice();
+});
+
+[songPracticeCountIn, songPracticeMetronome, songPracticePiano, songPracticeBass].forEach((control) => {
+  control?.addEventListener("change", () => {
+    if (songPracticeState.playing) startSelectedSongPractice();
+  });
 });
 
 modeButtons.forEach((button) => {
@@ -7604,11 +8885,6 @@ inspirationSort?.addEventListener("change", () => {
 
 inspirationFavoriteFilter?.addEventListener("click", () => {
   inspirationState.favoritesOnly = !inspirationState.favoritesOnly;
-  renderSongInspirations();
-});
-
-inspirationGroupToggle?.addEventListener("click", () => {
-  inspirationState.groupMode = inspirationState.groupMode === "artist" ? "style" : "artist";
   renderSongInspirations();
 });
 
@@ -7692,6 +8968,25 @@ customZoomOut?.addEventListener("click", () => setCustomZoom(customState.zoom - 
 customZoomIn?.addEventListener("click", () => setCustomZoom(customState.zoom + 0.1));
 customZoomRange?.addEventListener("input", () => setCustomZoom(customZoomRange.value));
 
+function cleanAuthRedirectUrl() {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  ["code", "error", "error_code", "error_description"].forEach((parameter) => {
+    url.searchParams.delete(parameter);
+  });
+  return url.href;
+}
+
+function friendlyAuthError(error) {
+  const message = String(error?.message || "").trim();
+  if (/rate limit|too many requests/i.test(message)) {
+    return "Er zijn kort na elkaar te veel loginlinks aangevraagd. Wacht één minuut en probeer het daarna opnieuw.";
+  }
+  return message
+    ? `Inloggen lukt nog niet: ${message}`
+    : "De loginlink kon niet verstuurd worden. Controleer het e-mailadres en probeer opnieuw.";
+}
+
 authForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!authClient || !authEmail || !authSubmit) {
@@ -7708,13 +9003,13 @@ authForm?.addEventListener("submit", async (event) => {
     const { error } = await authClient.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.href.split("#")[0]
+        emailRedirectTo: cleanAuthRedirectUrl()
       }
     });
     if (error) throw error;
     setAuthStatus("Check je e-mail. Klik op de link om de app op dit apparaat te openen.");
   } catch (error) {
-    setAuthStatus("De loginlink kon niet verstuurd worden. Controleer het e-mailadres en probeer opnieuw.", true);
+    setAuthStatus(friendlyAuthError(error), true);
     console.warn("auth magic link failed", error);
   } finally {
     authSubmit.disabled = false;
@@ -7751,7 +9046,7 @@ accessCodeForm?.addEventListener("submit", async (event) => {
     const { error } = await authClient.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.href.split("#")[0]
+        emailRedirectTo: cleanAuthRedirectUrl()
       }
     });
     if (error) throw error;
@@ -7799,6 +9094,7 @@ async function signOutUser() {
 }
 
 authLogout?.addEventListener("click", signOutUser);
+desktopAuthLogout?.addEventListener("click", signOutUser);
 mobileAuthLogout?.addEventListener("click", signOutUser);
 
 authClient?.auth.onAuthStateChange((event) => {
@@ -8051,6 +9347,12 @@ function createCustomPdf() {
 customPrintButton?.addEventListener("click", openCustomPrintView);
 customPdfButton?.addEventListener("click", createCustomPdf);
 
+earTrainingListen?.addEventListener("click", () => playEarTrainingChord());
+earTrainingNext?.addEventListener("click", nextEarTrainingQuestion);
+earTrainingCompare?.addEventListener("click", playEarTrainingComparison);
+earTrainingLevel?.addEventListener("change", resetEarTraining);
+resetEarTraining();
+
 pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setActivePage(tab.dataset.page);
@@ -8268,11 +9570,44 @@ refreshAuthAccess();
       }
 
       .ns-request-mobile-tab {
-        width: auto;
-        display: inline-flex;
+        width: 100%;
+        min-height: 42px;
+        display: flex;
         align-items: center;
-        justify-content: center;
-        margin: 0.35rem;
+        justify-content: flex-start;
+        margin: 0;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        box-shadow: none;
+        text-align: left;
+        font-size: inherit;
+        font-weight: 900;
+      }
+
+      #mobilePageMenu .mobile-page-menu-item,
+      #mobilePageMenu .ns-request-mobile-tab {
+        border-radius: 10px !important;
+        transition: background-color 160ms ease, color 160ms ease !important;
+      }
+
+      #mobilePageMenu .mobile-page-menu-item:hover,
+      #mobilePageMenu .ns-request-mobile-tab:hover {
+        border-radius: 10px !important;
+        background: rgba(213, 165, 29, 0.16) !important;
+        color: var(--ns-ink) !important;
+        transform: none !important;
+      }
+
+      #mobilePageMenu .mobile-page-menu-item.active,
+      #mobilePageMenu .mobile-page-menu-item:active,
+      #mobilePageMenu .ns-request-mobile-tab.is-active,
+      #mobilePageMenu .ns-request-mobile-tab:active {
+        border-radius: 10px !important;
+        background: var(--ns-gold) !important;
+        color: var(--ns-ink) !important;
+        transform: none !important;
       }
 
       .ns-song-request-page[hidden] {
