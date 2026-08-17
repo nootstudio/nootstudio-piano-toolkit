@@ -9561,8 +9561,8 @@ refreshAuthAccess();
         transition: transform 160ms ease, color 160ms ease, background 160ms ease, border-color 160ms ease;
       }
 
-      .ns-request-nav-button:hover,
-      .ns-request-nav-button.is-active {
+      .ns-request-nav-button:not(.ns-request-mobile-tab):hover,
+      .ns-request-nav-button:not(.ns-request-mobile-tab).is-active {
         background: var(--ns-gold);
         border-color: var(--ns-gold);
         color: var(--ns-ink);
@@ -9592,8 +9592,8 @@ refreshAuthAccess();
         transition: background-color 160ms ease, color 160ms ease !important;
       }
 
-      #mobilePageMenu .mobile-page-menu-item:hover,
-      #mobilePageMenu .ns-request-mobile-tab:hover {
+      #mobilePageMenu .mobile-page-menu-item:not(.active):hover,
+      #mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
         border-radius: 10px !important;
         background: rgba(213, 165, 29, 0.16) !important;
         color: var(--ns-ink) !important;
@@ -9601,9 +9601,7 @@ refreshAuthAccess();
       }
 
       #mobilePageMenu .mobile-page-menu-item.active,
-      #mobilePageMenu .mobile-page-menu-item:active,
-      #mobilePageMenu .ns-request-mobile-tab.is-active,
-      #mobilePageMenu .ns-request-mobile-tab:active {
+      #mobilePageMenu .ns-request-mobile-tab.is-active {
         border-radius: 10px !important;
         background: var(--ns-gold) !important;
         color: var(--ns-ink) !important;
