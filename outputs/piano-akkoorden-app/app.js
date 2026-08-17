@@ -9851,10 +9851,56 @@ refreshAuthAccess();
     const host = document.querySelector("main") || document.getElementById("app") || document.body;
     host.appendChild(page);
 
-    page.querySelector("form").addEventListener("submit", function (event) {
+    page.querySelector("form").addEventListener("submit", async function (event) {
       event.preventDefault();
-      page.querySelector("[data-request-status]").textContent =
-        "Ontwerpvoorbeeld: deze aanvraag is nog niet opgeslagen, maar zo kan de leerlingflow eruitzien.";
+      const form = event.currentTarget;
+      const status = page.querySelector("[data-request-status]");
+      const submitButton = form.querySelector('[type="submit"]');
+      const formData = new FormData(form);
+      const title = String(formData.get("title") || "").trim();
+      const artist = String(formData.get("artist") || "").trim();
+
+      if (!title) {
+        status.textContent = "Vul eerst de titel van het liedje in.";
+        return;
+      }
+
+      if (!authClient) {
+        status.textContent = "Opslaan is nu niet beschikbaar. Probeer het later opnieuw.";
+        return;
+      }
+
+      submitButton.disabled = true;
+      status.textContent = "Aanvraag wordt opgeslagen…";
+
+      try {
+        const { data: sessionData, error: sessionError } = await authClient.auth.getSession();
+        if (sessionError) throw sessionError;
+
+        const user = sessionData?.session?.user;
+        if (!user?.id || !user?.email) {
+          status.textContent = "Log opnieuw in om een liedje aan te vragen.";
+          return;
+        }
+
+        const { error } = await authClient.from("song_requests").insert({
+          user_id: user.id,
+          email: user.email,
+          title,
+          artist: artist || null,
+          status: "nieuw",
+        });
+        if (error) throw error;
+
+        form.reset();
+        status.textContent = "Dank je! Je aanvraag is opgeslagen.";
+        await window.NootstudioSongRequests?.reload?.();
+      } catch (error) {
+        console.error("Liedje aanvragen mislukt:", error);
+        status.textContent = "De aanvraag kon niet worden opgeslagen. Probeer het opnieuw.";
+      } finally {
+        submitButton.disabled = false;
+      }
     });
 
     page.querySelector("[data-request-close]").addEventListener("click", hideRequestPage);
