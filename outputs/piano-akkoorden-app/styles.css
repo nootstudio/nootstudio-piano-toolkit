@@ -8117,8 +8117,8 @@ textarea,
   white-space: nowrap;
 }
 
-.ns-request-nav-button:hover,
-.ns-request-nav-button.is-active {
+.ns-request-nav-button:not(.ns-request-mobile-tab):hover,
+.ns-request-nav-button:not(.ns-request-mobile-tab).is-active {
   background: #d5a51d;
   color: #1f2024;
   transform: translateY(-1px);
@@ -8502,8 +8502,8 @@ textarea,
   transition: background-color 160ms ease, color 160ms ease !important;
 }
 
-#mobilePageMenu .mobile-page-menu-item:hover,
-#mobilePageMenu .ns-request-mobile-tab:hover {
+#mobilePageMenu .mobile-page-menu-item:not(.active):hover,
+#mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
   border-radius: 10px !important;
   background: rgba(213, 165, 29, 0.16) !important;
   color: var(--ink) !important;
@@ -8511,9 +8511,7 @@ textarea,
 }
 
 #mobilePageMenu .mobile-page-menu-item.active,
-#mobilePageMenu .mobile-page-menu-item:active,
-#mobilePageMenu .ns-request-mobile-tab.is-active,
-#mobilePageMenu .ns-request-mobile-tab:active {
+#mobilePageMenu .ns-request-mobile-tab.is-active {
   border-radius: 10px !important;
   background: var(--accent) !important;
   color: #151515 !important;
