@@ -9595,7 +9595,7 @@ refreshAuthAccess();
       #mobilePageMenu .mobile-page-menu-item:not(.active):hover,
       #mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
         border-radius: 10px !important;
-        background: rgba(213, 165, 29, 0.16) !important;
+        background: rgba(213, 165, 29, 0.24) !important;
         color: var(--ns-ink) !important;
         transform: none !important;
       }
@@ -9863,6 +9863,7 @@ refreshAuthAccess();
   function setRequestActive(active) {
     document.querySelectorAll("[data-ns-request-tab]").forEach(function (button) {
       button.classList.toggle("is-active", active);
+      button.classList.toggle("active", active);
       button.setAttribute("aria-current", active ? "page" : "false");
     });
   }
@@ -9911,7 +9912,7 @@ refreshAuthAccess();
       return /Akkoorden/i.test(text) && !element.querySelector("[data-ns-request-tab]");
     });
     if (!target) return;
-    const button = makeButton("ns-request-mobile-tab");
+    const button = makeButton("mobile-page-menu-item ns-request-mobile-tab");
     const divider = target.querySelector(":scope > .ns-menu-divider");
     const logout = target.querySelector("#mobileAuthLogout");
     target.insertBefore(button, divider || logout || null);
