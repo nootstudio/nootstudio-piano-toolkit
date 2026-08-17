@@ -8507,12 +8507,6 @@ textarea,
   background: transparent !important;
 }
 
-#mobilePageMenu .ns-request-mobile-tab.is-menu-hovered:not(.is-active) {
-  border-radius: 10px !important;
-  color: var(--ink) !important;
-  background: rgba(213, 165, 29, 0.24) !important;
-}
-
 #mobilePageMenu .mobile-page-menu-item:not(.active):hover,
 #mobilePageMenu .ns-request-mobile-tab:not(.is-active):hover {
   border-radius: 10px !important;
