@@ -1050,7 +1050,8 @@ h2 {
 
 .show-chord-button {
   box-sizing: border-box;
-  width: calc(100% - 18px);
+  width: max-content;
+  max-width: calc(100% - 18px);
   min-height: 48px;
   margin-left: 18px;
   border: 0;
@@ -1063,6 +1064,8 @@ h2 {
   font-size: 0.92rem;
   font-weight: 900;
   line-height: 1.15;
+  white-space: nowrap;
+  justify-self: start;
 }
 
 .show-chord-button:hover {
@@ -2782,6 +2785,9 @@ textarea {
   font-weight: 900;
   cursor: pointer;
   white-space: nowrap;
+  width: max-content;
+  max-width: 100%;
+  align-self: flex-start;
 }
 
 .song-practice-start span {
@@ -2819,6 +2825,16 @@ textarea {
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 850;
+}
+
+.song-practice-section-field {
+  width: 190px;
+  max-width: 100%;
+}
+
+#songPracticeSection {
+  width: 190px;
+  max-width: 100%;
 }
 
 .song-practice-controls select,
@@ -2952,7 +2968,9 @@ textarea {
   }
 
   .song-practice-start {
-    width: 100%;
+    width: max-content;
+    max-width: 100%;
+    align-self: flex-start;
   }
 
   .song-practice-controls {
@@ -6067,7 +6085,8 @@ textarea {
   }
 
   .show-chord-button {
-    width: calc(100% - 8px);
+    width: max-content;
+    max-width: calc(100% - 8px);
     min-height: 52px;
     margin-left: 8px;
   }
