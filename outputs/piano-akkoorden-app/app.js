@@ -505,6 +505,7 @@ const keySelect = document.querySelector("#keySelect");
 const scaleSelect = document.querySelector("#scaleSelect");
 const qualitySelect = document.querySelector("#qualitySelect");
 const inversionSelect = document.querySelector("#inversionSelect");
+const showChordButton = document.querySelector("#showChordButton");
 const chordPickerHeading = document.querySelector("#chordPickerControl > label");
 const keyboard = document.querySelector("#keyboard");
 const keyboardScroll = document.querySelector(".keyboard-scroll");
@@ -4175,9 +4176,18 @@ function selectedSongPracticeIdentity(song = state.selectedInspirationSong) {
 }
 
 function clearSongPracticeHighlights() {
-  selectedSongChordList?.querySelectorAll(".practice-current, .practice-next").forEach((button) => {
-    button.classList.remove("practice-current", "practice-next");
+  selectedSongChordList?.querySelectorAll(".practice-current, .practice-next, .song-playhead-active").forEach((button) => {
+    button.classList.remove("practice-current", "practice-next", "song-playhead-active");
+    button.style.removeProperty("--song-playhead-duration");
   });
+}
+
+function startSongPlayhead(element, durationSeconds) {
+  if (!element) return;
+  element.classList.remove("song-playhead-active");
+  element.style.setProperty("--song-playhead-duration", `${Math.max(0.12, durationSeconds)}s`);
+  void element.offsetWidth;
+  element.classList.add("song-playhead-active");
 }
 
 function updateSongPracticeButton() {
@@ -4304,7 +4314,7 @@ function scheduleSongPracticeClick(context, time, accent = false) {
   songPracticeState.scheduledClicks.push(oscillator);
 }
 
-function setSongPracticeActiveEvent(events, eventIndex) {
+function setSongPracticeActiveEvent(events, eventIndex, secondsPerBeat) {
   clearSongPracticeHighlights();
   const event = events[eventIndex];
   const nextEvent = events[eventIndex + 1];
@@ -4314,6 +4324,7 @@ function setSongPracticeActiveEvent(events, eventIndex) {
     ? selectedSongChordList?.querySelector(`[data-practice-index="${nextEvent.displayIndex}"]`)
     : null;
   currentButton?.classList.add("practice-current");
+  startSongPlayhead(currentButton, event.beats * secondsPerBeat);
   nextButton?.classList.add("practice-next");
   if (songPracticeCurrent) songPracticeCurrent.innerHTML = formatMusicText(event.token || "N.C.");
   if (songPracticeNext) songPracticeNext.innerHTML = nextEvent ? formatMusicText(nextEvent.token || "N.C.") : "Einde";
@@ -4395,7 +4406,7 @@ async function startSelectedSongPractice() {
     }
     songPracticeState.timeouts.push(window.setTimeout(() => {
       if (songPracticeState.runId !== runId) return;
-      setSongPracticeActiveEvent(events, eventIndex);
+      setSongPracticeActiveEvent(events, eventIndex, secondsPerBeat);
     }, delayMs));
   });
 
@@ -5599,11 +5610,42 @@ function updateInversions() {
   }
 }
 
+function updateDraftInversions() {
+  const quality = qualities.find((item) => item.id === qualitySelect.value) || state.quality;
+  const allowed = quality.intervals.length - 1;
+  [...inversionSelect.options].forEach((option) => {
+    option.disabled = Number(option.value) > allowed;
+  });
+  if (Number(inversionSelect.value) > allowed) {
+    inversionSelect.value = String(allowed);
+  }
+}
+
+function applyChordPickerSelection() {
+  const root = rootOptions[Number(rootSelect.value)];
+  const quality = qualities.find((item) => item.id === qualitySelect.value);
+  if (!root || !quality) return;
+
+  const allowed = quality.intervals.length - 1;
+  const inversion = Math.min(Number(inversionSelect.value) || 0, allowed);
+  inversionSelect.value = String(inversion);
+  state.root = root;
+  state.libraryRoot = root;
+  state.quality = quality;
+  state.inversion = inversion;
+  state.selectedRootAbsolute = null;
+  state.chordActive = true;
+  requestKeyboardFocus();
+  render();
+  scrollToChordInfoBlock();
+}
+
 function renderChordMode() {
   chordModeButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.chordMode === state.chordMode);
   });
   if (chordSearchPanel) chordSearchPanel.hidden = state.chordMode !== "search";
+  if (showChordButton) showChordButton.hidden = state.chordMode === "search";
   appShell.classList.toggle("chord-search-mode", state.chordMode === "search");
 }
 
@@ -8432,8 +8474,9 @@ function buildSongPlayback() {
 }
 
 function clearSongActiveCards() {
-  document.querySelectorAll(".song-chord-card.playing").forEach((card) => {
-    card.classList.remove("playing");
+  document.querySelectorAll(".song-chord-card.playing, .song-chord-card.song-playhead-active").forEach((card) => {
+    card.classList.remove("playing", "song-playhead-active");
+    card.style.removeProperty("--song-playhead-duration");
   });
 }
 
@@ -8469,6 +8512,7 @@ async function startSongPlayback() {
       const card = document.querySelectorAll(".song-chord-card[data-notes]")[event.cardIndex];
       if (card) {
         card.classList.add("playing", "played");
+        startSongPlayhead(card, event.duration);
         card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
       }
     }, event.time * 1000));
@@ -8745,13 +8789,7 @@ function render() {
 }
 
 rootSelect.addEventListener("change", () => {
-  state.root = rootOptions[Number(rootSelect.value)];
-  state.libraryRoot = state.root;
-  state.selectedRootAbsolute = null;
-  state.chordActive = true;
-  requestKeyboardFocus();
-  render();
-  scrollToChordInfoBlock();
+  updateDraftInversions();
 });
 
 keySelect.addEventListener("change", () => {
@@ -8774,22 +8812,14 @@ scaleSelect.addEventListener("change", () => {
 });
 
 qualitySelect.addEventListener("change", () => {
-  state.quality = qualities.find((quality) => quality.id === qualitySelect.value);
-  state.selectedRootAbsolute = null;
-  state.chordActive = true;
-  requestKeyboardFocus();
-  render();
-  scrollToChordInfoBlock();
+  updateDraftInversions();
 });
 
 inversionSelect.addEventListener("change", () => {
-  state.inversion = Number(inversionSelect.value);
-  state.selectedRootAbsolute = null;
-  state.chordActive = true;
-  requestKeyboardFocus();
-  render();
-  scrollToChordInfoBlock();
+  updateDraftInversions();
 });
+
+showChordButton?.addEventListener("click", applyChordPickerSelection);
 
 filterInput.addEventListener("input", renderGrid);
 
