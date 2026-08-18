@@ -56,6 +56,7 @@ SUPABASE_URL=https://jouw-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
 SHOPIFY_WEBHOOK_SECRET=...
 SHOPIFY_PRODUCT_ID=...
+APP_URL=https://nootstudio-akkoorden.netlify.app/
 ```
 
 Belangrijk:
@@ -63,6 +64,7 @@ Belangrijk:
 - `SUPABASE_SERVICE_ROLE_KEY` mag nooit in `app-config.js` of andere frontend-bestanden.
 - `SHOPIFY_WEBHOOK_SECRET` mag alleen server-side in Netlify staan.
 - `SHOPIFY_PRODUCT_ID` is het Shopify product dat levenslange toegang geeft.
+- `APP_URL` is het adres waar de koper na het aanklikken van de automatische loginlink terechtkomt. Als deze variabele ontbreekt, gebruikt de functie de standaard Netlify-variabele `URL`.
 
 Frontend/public configuratie blijft beperkt tot:
 
@@ -96,6 +98,7 @@ De Netlify Function:
 - maakt een levenslange entitlement aan;
 - koppelt de entitlement aan een bestaand Supabase account als het e-mailadres al bestaat;
 - laat de entitlement pending op e-mailadres als het account later wordt aangemaakt.
+- verstuurt via de bestaande Nederlandse Supabase Magic Link-template automatisch een persoonlijke loginlink naar de koper.
 
 ## 5. Volgende implementatiefase
 
@@ -107,4 +110,3 @@ De huidige frontend gebruikt nog niet actief Supabase Auth en entitlement-gating
 4. App pas tonen als `has_active_entitlement()` true is.
 5. Admin-only UI maken voor liedjes toevoegen/verwijderen.
 6. Oude `student_code` favorieten vervangen door user-based `favorites`.
-

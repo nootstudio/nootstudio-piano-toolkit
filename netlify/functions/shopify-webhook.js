@@ -7,9 +7,13 @@ const json = (statusCode, body) => ({
 });
 
 function requiredEnv(name) {
-  const value = process.env[name];
+  const value = globalThis.Netlify?.env?.get(name) || process.env[name];
   if (!value) throw new Error(`Missing ${name}`);
   return value;
+}
+
+function optionalEnv(name) {
+  return globalThis.Netlify?.env?.get(name) || process.env[name] || "";
 }
 
 function rawRequestBody(event) {
@@ -49,8 +53,9 @@ async function supabaseFetch(path, options = {}) {
     const text = await response.text();
     throw new Error(`Supabase ${response.status}: ${text}`);
   }
-  if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  if (!text.trim()) return null;
+  return JSON.parse(text);
 }
 
 async function existingWebhookEvent(webhookId) {
@@ -97,10 +102,37 @@ function orderEmail(order) {
 }
 
 function matchingLineItem(order) {
-  const configuredProductId = process.env.SHOPIFY_PRODUCT_ID;
+  const configuredProductId = optionalEnv("SHOPIFY_PRODUCT_ID");
   const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
   if (!configuredProductId) return lineItems[0] || null;
   return lineItems.find((item) => String(item.product_id) === String(configuredProductId)) || null;
+}
+
+function purchaseEmailRedirectUrl() {
+  const configuredUrl = optionalEnv("APP_URL") || optionalEnv("URL");
+  if (!configuredUrl) throw new Error("Missing APP_URL or URL");
+  const url = new URL(configuredUrl);
+  url.hash = "";
+  url.search = "";
+  return url.href;
+}
+
+async function sendPurchaseAccessEmail({ email, order }) {
+  const redirectTo = purchaseEmailRedirectUrl();
+  await supabaseFetch(`/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      email,
+      create_user: true,
+      data: {
+        purchase_source: "shopify",
+        shopify_order_id: String(order.id)
+      }
+    })
+  });
 }
 
 async function upsertProduct(lineItem) {
@@ -183,7 +215,8 @@ async function processPaidOrder(order) {
   const product = await upsertProduct(lineItem);
   const entitlement = await upsertEntitlement({ order, lineItem, product, email });
   await upsertShopifyOrder({ order, product, entitlement, email });
-  return { status: "processed", entitlementId: entitlement.id };
+  await sendPurchaseAccessEmail({ email, order });
+  return { status: "processed", entitlementId: entitlement.id, accessEmailSent: true };
 }
 
 exports.handler = async (event) => {
