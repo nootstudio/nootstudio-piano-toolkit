@@ -1048,6 +1048,40 @@ h2 {
   background-size: 24px 24px, auto;
 }
 
+.show-chord-button {
+  box-sizing: border-box;
+  width: calc(100% - 18px);
+  min-height: 48px;
+  margin-left: 18px;
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 18px;
+  color: #151515;
+  background: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.show-chord-button:hover {
+  filter: brightness(1.04);
+}
+
+.show-chord-button:focus-visible {
+  outline: 3px solid #0669d7;
+  outline-offset: 3px;
+}
+
+.show-chord-button:active {
+  transform: translateY(1px);
+}
+
+.show-chord-button[hidden] {
+  display: none;
+}
+
 label {
   color: var(--muted);
   font-size: 0.8rem;
@@ -3554,6 +3588,7 @@ textarea {
 }
 
 .selected-song-chord {
+  position: relative;
   min-width: 48px;
   min-height: 38px;
   border: 1px solid rgba(213, 165, 29, 0.6);
@@ -3564,6 +3599,31 @@ textarea {
   cursor: pointer;
   font: inherit;
   text-align: left;
+}
+
+@keyframes song-playhead-sweep {
+  from {
+    left: 2px;
+  }
+  to {
+    left: calc(100% - 5px);
+  }
+}
+
+.selected-song-chord.song-playhead-active::after,
+.song-chord-card.song-playhead-active::after {
+  content: "";
+  position: absolute;
+  z-index: 6;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: 3px;
+  border-radius: 999px;
+  background: #0080c8;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.72), 0 0 7px rgba(0, 128, 200, 0.46);
+  pointer-events: none;
+  animation: song-playhead-sweep var(--song-playhead-duration, 1s) linear forwards;
 }
 
 .selected-song-chord.four-beats {
@@ -5092,6 +5152,7 @@ textarea {
 }
 
 .song-chord-card {
+  position: relative;
   min-height: 194px;
   border: 0;
   border-radius: 0;
@@ -6003,6 +6064,12 @@ textarea {
   .indented-control {
     margin-left: 8px;
     padding-left: 10px;
+  }
+
+  .show-chord-button {
+    width: calc(100% - 8px);
+    min-height: 52px;
+    margin-left: 8px;
   }
 
   .split-control {
