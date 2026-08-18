@@ -1,34 +1,28 @@
-const crypto = require("crypto");
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
-const json = (statusCode, body) => ({
-  statusCode,
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify(body)
-});
+function json(status, body) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" }
+  });
+}
 
 function requiredEnv(name) {
-  const value = globalThis.Netlify?.env?.get(name) || process.env[name];
+  const value = Netlify.env.get(name);
   if (!value) throw new Error(`Missing ${name}`);
   return value;
 }
 
 function optionalEnv(name) {
-  return globalThis.Netlify?.env?.get(name) || process.env[name] || "";
-}
-
-function rawRequestBody(event) {
-  return Buffer.from(event.body || "", event.isBase64Encoded ? "base64" : "utf8");
+  return Netlify.env.get(name) || "";
 }
 
 function verifyShopifyHmac(rawBody, receivedHmac, secret) {
   if (!receivedHmac) return false;
-  const digest = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
-    .digest("base64");
+  const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
   const expected = Buffer.from(digest, "utf8");
   const actual = Buffer.from(receivedHmac, "utf8");
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
 function supabaseHeaders(extra = {}) {
@@ -49,11 +43,8 @@ async function supabaseFetch(path, options = {}) {
     ...options,
     headers: supabaseHeaders(options.headers || {})
   });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Supabase ${response.status}: ${text}`);
-  }
   const text = await response.text();
+  if (!response.ok) throw new Error(`Supabase ${response.status}: ${text}`);
   if (!text.trim()) return null;
   return JSON.parse(text);
 }
@@ -121,9 +112,7 @@ async function sendPurchaseAccessEmail({ email, order }) {
   const redirectTo = purchaseEmailRedirectUrl();
   await supabaseFetch(`/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json"
-    },
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email,
       create_user: true,
@@ -136,7 +125,6 @@ async function sendPurchaseAccessEmail({ email, order }) {
 }
 
 async function upsertProduct(lineItem) {
-  const shopifyProductId = String(lineItem.product_id || "");
   const rows = await supabaseFetch("/rest/v1/products?on_conflict=shopify_product_id", {
     method: "POST",
     headers: {
@@ -144,7 +132,7 @@ async function upsertProduct(lineItem) {
       Prefer: "resolution=merge-duplicates,return=representation"
     },
     body: JSON.stringify({
-      shopify_product_id: shopifyProductId,
+      shopify_product_id: String(lineItem.product_id || ""),
       name: lineItem.title || "Nootstudio Akkoorden",
       active: true
     })
@@ -161,30 +149,33 @@ async function findProfileByEmail(email) {
 
 async function upsertEntitlement({ order, lineItem, product, email }) {
   const profile = await findProfileByEmail(email);
-  const rows = await supabaseFetch("/rest/v1/entitlements?on_conflict=source,source_order_id,product_id", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=representation"
-    },
-    body: JSON.stringify({
-      user_id: profile?.user_id || null,
-      product_id: product.id,
-      customer_email: email,
-      source: "shopify",
-      source_order_id: String(order.id),
-      source_line_item_id: lineItem.id ? String(lineItem.id) : null,
-      starts_at: new Date().toISOString(),
-      expires_at: null,
-      revoked_at: null,
-      metadata: {
-        order_name: order.name || "",
-        order_number: order.order_number || "",
-        product_id: lineItem.product_id || "",
-        variant_id: lineItem.variant_id || ""
-      }
-    })
-  });
+  const rows = await supabaseFetch(
+    "/rest/v1/entitlements?on_conflict=source,source_order_id,product_id",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify({
+        user_id: profile?.user_id || null,
+        product_id: product.id,
+        customer_email: email,
+        source: "shopify",
+        source_order_id: String(order.id),
+        source_line_item_id: lineItem.id ? String(lineItem.id) : null,
+        starts_at: new Date().toISOString(),
+        expires_at: null,
+        revoked_at: null,
+        metadata: {
+          order_name: order.name || "",
+          order_number: order.order_number || "",
+          product_id: lineItem.product_id || "",
+          variant_id: lineItem.variant_id || ""
+        }
+      })
+    }
+  );
   return rows[0];
 }
 
@@ -219,19 +210,18 @@ async function processPaidOrder(order) {
   return { status: "processed", entitlementId: entitlement.id, accessEmailSent: true };
 }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== "POST") {
-    console.log("shopify-webhook rejected non-POST request", { method: event.httpMethod });
+export default async (request) => {
+  if (request.method !== "POST") {
+    console.log("shopify-webhook rejected non-POST request", { method: request.method });
     return json(405, { error: "Method not allowed" });
   }
 
-  const rawBody = rawRequestBody(event);
-  const headers = event.headers || {};
-  const hmac = headers["x-shopify-hmac-sha256"] || headers["X-Shopify-Hmac-Sha256"];
-  const topic = headers["x-shopify-topic"] || headers["X-Shopify-Topic"] || "";
-  const shopDomain = headers["x-shopify-shop-domain"] || headers["X-Shopify-Shop-Domain"] || "";
-  const webhookId = headers["x-shopify-webhook-id"] || headers["X-Shopify-Webhook-Id"]
-    || crypto.createHash("sha256").update(rawBody).digest("hex");
+  const rawBody = Buffer.from(await request.arrayBuffer());
+  const hmac = request.headers.get("x-shopify-hmac-sha256") || "";
+  const topic = request.headers.get("x-shopify-topic") || "";
+  const shopDomain = request.headers.get("x-shopify-shop-domain") || "";
+  const webhookId = request.headers.get("x-shopify-webhook-id")
+    || createHash("sha256").update(rawBody).digest("hex");
 
   console.log("shopify-webhook received", {
     topic: topic || "missing",
@@ -242,29 +232,27 @@ exports.handler = async (event) => {
   });
 
   if (!verifyShopifyHmac(rawBody, hmac, requiredEnv("SHOPIFY_WEBHOOK_SECRET"))) {
-    console.warn("shopify-webhook invalid hmac", {
-      topic: topic || "missing",
-      shopDomain: shopDomain || "missing",
-      webhookId,
-      hasHmac: Boolean(hmac)
-    });
+    console.warn("shopify-webhook invalid hmac", { topic, shopDomain, webhookId });
     return json(401, { error: "Invalid HMAC" });
   }
 
   const existing = await existingWebhookEvent(webhookId);
   if (existing?.status === "processed" || existing?.status === "ignored") {
-    console.log("shopify-webhook duplicate ignored", { webhookId, status: existing.status });
     return json(200, { ok: true, duplicate: true });
   }
 
-  const payload = JSON.parse(rawBody.toString("utf8"));
+  let payload;
+  try {
+    payload = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    return json(400, { error: "Invalid JSON" });
+  }
+
   const eventRow = existing || await insertWebhookEvent({ webhookId, topic, shopDomain, payload });
-  console.log("shopify-webhook event stored", { webhookId, topic, eventId: eventRow.id });
 
   try {
     if (topic !== "orders/paid") {
       await markWebhookEvent(eventRow.id, "ignored");
-      console.log("shopify-webhook ignored topic", { webhookId, topic });
       return json(200, { ok: true, ignored: topic || "unknown topic" });
     }
 
@@ -273,8 +261,16 @@ exports.handler = async (event) => {
     console.log("shopify-webhook completed", { webhookId, ...result });
     return json(200, { ok: true, ...result });
   } catch (error) {
-    await markWebhookEvent(eventRow.id, "failed", error.message);
-    console.error("shopify-webhook failed", { webhookId, message: error.message });
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      await markWebhookEvent(eventRow.id, "failed", message);
+    } catch (markError) {
+      console.error("shopify-webhook could not store failure", {
+        webhookId,
+        message: markError instanceof Error ? markError.message : String(markError)
+      });
+    }
+    console.error("shopify-webhook failed", { webhookId, message });
     return json(500, { error: "Webhook processing failed" });
   }
 };
