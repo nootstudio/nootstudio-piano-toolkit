@@ -8783,7 +8783,7 @@ function render() {
   renderCustomComposer();
   attachChordAutocomplete();
   focusActiveChordOnKeyboard();
-  if (shouldAutoFocusKeyboard()) {
+  if (shouldAutoFocusKeyboard() && !state.chordActive) {
     centerCurrentScaleOnKeyboard();
   }
 }
